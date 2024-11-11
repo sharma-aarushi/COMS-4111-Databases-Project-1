@@ -53,9 +53,37 @@ def show_popular_listings():
 
     return render_template("home.html", popular_items=popular_items)
 
-# @app.route('/test')
-# def test_page():
-#     return "Flask is working!"
+from sqlalchemy import text
+from flask import flash, render_template, g
+
+from sqlalchemy import text
+from flask import flash, render_template, g
+
+from sqlalchemy import text
+from flask import flash, render_template, g
+
+@app.route('/test')
+def test_page():
+    try:
+        # Define the SQL query with named parameters
+        query = text("INSERT INTO Users (uni, name, columbiaemail, verificationstatus) VALUES (:uni, :name, :columbiaemail, :verificationstatus)")
+        
+        # Execute the query with a dictionary of parameters
+        g.conn.execute(query, {
+            "uni": "test_uni2",
+            "name": "test_name2",
+            "columbiaemail": "test2@test.com",
+            "verificationstatus": "t"
+        })
+        
+        # Commit the transaction
+        g.conn.commit()
+        flash("User created successfully.")
+    except Exception as e:
+        print("Error occurred:", e)
+        flash("An error occurred while trying to create the user.")
+    
+    return render_template("create_listing.html")
 
 @app.route('/view/<int:listing_id>')
 def view_item(listing_id):
@@ -109,11 +137,15 @@ def new_listing():
         price = request.form.get('price')
         condition = request.form.get('condition')
         status = request.form.get('status')
+        link = request.form.get('link')
         creatorid = "demo_uni"  # Assigning demo user ID for testing
         
         # Automatically set today's date
         dateadded = date.today()
 
+        # Print values for debugging
+        print("Form Data:", title, location, category, description, price, condition, status, link)
+        
         # Check if all fields are provided
         if not all([title, location, category, description, price, condition, status]):
             flash("All fields are required.")
@@ -122,33 +154,32 @@ def new_listing():
         # Convert price to float and handle exceptions
         try:
             price = float(price)
+            print("Converted Price:", price)
         except ValueError:
             flash("Invalid price value.")
             return redirect(url_for('new_listing'))
 
-        # Insert listing into the database
-        query = text("""
-            INSERT INTO Listings (title, location, category, createdby, description, price, condition, status, dateadded)
-            VALUES (:title, :location, :category, :creatorid, :description, :price, :condition, :status, :dateadded)
-        """)
+        print("Date Added:", dateadded)
 
-        try:
-            with g.conn as conn:
-                conn.execute(query, {
-                    'title': title,
-                    'location': location,
-                    'category': category,
-                    'creatorid': creatorid,
-                    'description': description,
-                    'price': price,
-                    'condition': condition,
-                    'status': status,
-                    'dateadded': dateadded
-                })
-                flash("Listing created successfully.")
-        except Exception as e:
-            flash(f"An error occurred: {str(e)}")
-            return redirect(url_for('new_listing'))
+        # Insert listing into the database
+        # try:
+        # g.conn.execute(
+        #         "INSERT INTO Listings (title, location, category, createdby, description, price, condition, status, link, dateadded) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        #         (title, location, category, creatorid, description, price, condition, status, link, dateadded)
+        #     )
+        g.conn.execute("INSERT INTO Listings (listingid, title, location, category, createdby, description, price, condition, status, link, dateadded) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", ((32, title, location, category, creatorid, description, price, condition, status, link, dateadded),) )
+
+    
+        # g.conn.commit()
+   
+        # g.conn.execute(
+        # "INSERT INTO Users (uni, name, columbiaemail, verificationstatus) VALUES (%s, %s, %s, %s)", 
+        # (title,"me", "me@gmail.com","t"))
+        g.conn.commit()
+        flash("user created successfully.")
+        # except Exception as e:
+        #     flash(f"An error occurred while inserting data: {str(e)}")
+        #     return redirect(url_for('new_listing'))
 
         return redirect(url_for('show_popular_listings'))
 
@@ -317,10 +348,9 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8111, type=int)
+    @click.argument('PORT', default=8113, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
         app.run(host=HOST, port=PORT, debug=debug, threaded=threaded)
-
     run()
