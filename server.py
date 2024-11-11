@@ -126,6 +126,8 @@ def buy_item(listing_id):
     flash("Purchase successful.")
     return redirect(url_for('view_item', listing_id=listing_id))
 
+from sqlalchemy import text
+
 @app.route('/new_listing', methods=['GET', 'POST'])
 def new_listing():
     if request.method == 'POST':
@@ -138,7 +140,7 @@ def new_listing():
         condition = request.form.get('condition')
         status = request.form.get('status')
         link = request.form.get('link')
-        creatorid = "demo_uni"  # Assigning demo user ID for testing
+        createdby = "demo_uni"  # Assigning demo user ID for testing
         
         # Automatically set today's date
         dateadded = date.today()
@@ -147,7 +149,7 @@ def new_listing():
         print("Form Data:", title, location, category, description, price, condition, status, link)
         
         # Check if all fields are provided
-        if not all([title, location, category, description, price, condition, status]):
+        if not all([title, location, category, description, price, condition, status, link]):
             flash("All fields are required.")
             return redirect(url_for('new_listing'))
         
@@ -161,25 +163,38 @@ def new_listing():
 
         print("Date Added:", dateadded)
 
-        # Insert listing into the database
-        # try:
-        # g.conn.execute(
-        #         "INSERT INTO Listings (title, location, category, createdby, description, price, condition, status, link, dateadded) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-        #         (title, location, category, creatorid, description, price, condition, status, link, dateadded)
-        #     )
-        g.conn.execute("INSERT INTO Listings (listingid, title, location, category, createdby, description, price, condition, status, link, dateadded) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", ((32, title, location, category, creatorid, description, price, condition, status, link, dateadded),) )
+        # Insert listing into the database using text() with named parameters
+        query = text("""
+            INSERT INTO Listings (title, location, category, createdby, description, price, condition, status, link, dateadded)
+            VALUES (:title, :location, :category, :createdby, :description, :price, :condition, :status, :link, :dateadded)
+        """)
 
-    
-        # g.conn.commit()
-   
-        # g.conn.execute(
-        # "INSERT INTO Users (uni, name, columbiaemail, verificationstatus) VALUES (%s, %s, %s, %s)", 
-        # (title,"me", "me@gmail.com","t"))
-        g.conn.commit()
-        flash("user created successfully.")
-        # except Exception as e:
-        #     flash(f"An error occurred while inserting data: {str(e)}")
-        #     return redirect(url_for('new_listing'))
+        try:
+            print("Attempting to execute the insert statement...")
+            
+            # Execute the query
+            g.conn.execute(query, {
+                'title': title,
+                'location': location,
+                'category': category,
+                'createdby': createdby,
+                'description': description,
+                'price': price,
+                'condition': condition,
+                'status': status,
+                'link': link,
+                'dateadded': dateadded
+            })
+            
+            # Commit the transaction
+            g.conn.commit()  # Explicitly call commit here
+
+            print("Insert successful, commit executed.")
+            flash("Listing created successfully.")
+        except Exception as e:
+            print(f"An error occurred during insertion: {e}")
+            flash(f"An error occurred while inserting data: {str(e)}")
+            return redirect(url_for('new_listing'))
 
         return redirect(url_for('show_popular_listings'))
 
@@ -237,15 +252,36 @@ def highlight(text, keyword, limit=None):
 @app.route('/profile')
 def profile():
     user_uni = "demo_uni"  # Replace with session or actual user ID for real scenarios
-    query = text("""
-        SELECT listingid, title, dateadded 
-        FROM Listings 
-        WHERE createdby = :user_uni
-    """)
-    with g.conn as conn:
-        results = conn.execute(query, {'user_uni': user_uni}).fetchall()
-    
-    return render_template("profile.html", listings=results)
+
+    # Reconnect if the connection is closed
+    if g.conn is None:
+        g.conn = engine.connect()
+
+    # Start a transaction to ensure commit handling
+    with g.conn.begin() as transaction:
+        try:
+            # Fetch listings for the user
+            query = text("""
+                SELECT listingid, title, dateadded 
+                FROM Listings 
+                WHERE createdby = :user_uni
+            """)
+            listings = g.conn.execute(query, {'user_uni': user_uni}).fetchall()
+
+            # Fetch the user's name
+            user_query = text("SELECT name FROM Users WHERE uni = :user_uni")
+            user_name = g.conn.execute(user_query, {'user_uni': user_uni}).scalar()
+
+            # Explicitly commit the transaction if needed (not typically required for SELECT)
+            transaction.commit()
+
+        except Exception as e:
+            print(f"Error during database transaction: {e}")
+            transaction.rollback()  # Rollback in case of error
+            flash("An error occurred while fetching the profile.")
+            return redirect(url_for('show_popular_listings'))
+
+    return render_template("profile.html", listings=listings, user_name=user_name)
 
 @app.route('/messages')
 def messages():
@@ -348,7 +384,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8113, type=int)
+    @click.argument('PORT', default=8114, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
