@@ -1,40 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Create New Listing</title>
-</head>
+<!-- <!DOCTYPE html>
+<html lang="en"> -->
+{% extends "index.html" %}
+{% block content %}
+<!-- <head>
+  <meta charset="UTF-8">
+  <title>Create New Listing</title>
+</head> -->
+
 <body>
-    <h1>Create a New Listing</h1>
-    <form action="{{ url_for('new_listing') }}" method="POST">
-        <label for="title">Title:</label><br>
-        <input type="text" id="title" name="title" required><br>
+  <h1>Create a New Listing</h1>
+  <form action="{{ url_for('new_listing') }}" method="POST">
+    <label for="title">Title:</label><br>
+    <input type="text" id="title" name="title" required><br>
 
-        <label for="location">Location:</label><br>
-        <input type="text" id="location" name="location" required><br>
+    <label for="location">Location:</label><br>
+    <input type="text" id="location" name="location" required><br>
 
-        <label for="category">Category:</label><br>
-        <input type="text" id="category" name="category" required><br>
+    <label for="category">Category:</label><br>
+    <input type="text" id="category" name="category" required><br>
 
-        <label for="description">Description:</label><br>
-        <textarea id="description" name="description" required></textarea><br>
+    <label for="description">Description:</label><br>
+    <textarea id="description" name="description" required></textarea><br>
 
-        <label for="price">Price:</label><br>
-        <input type="number" id="price" name="price" step="0.01" required><br>
+    <label for="price">Price:</label><br>
+    <input type="number" id="price" name="price" step="0.01" required><br>
 
-        <label for="condition">Condition:</label><br>
-        <select id="condition" name="condition" required>
-            <option value="new">New</option>
-            <option value="used">Used</option>
-        </select><br>
+    <label for="condition">Condition:</label><br>
+    <select id="condition" name="condition" required>
+      <option value="new">New</option>
+      <option value="used">Used</option>
+    </select><br>
 
-        <label for="status">Status:</label><br>
-        <select id="status" name="status" required>
-            <option value="available">Available</option>
-            <option value="sold">Sold</option>
-        </select><br><br>
+    <label for="status">Status:</label><br>
+    <select id="status" name="status" required>
+      <option value="available">Available</option>
+      <option value="sold">Sold</option>
+    </select><br><br>
 
-        <button type="submit">Create Listing</button>
-    </form>
+    <!-- <label for="link">Link:</label><br>
+    <select id="link" name="link" required>
+      <input type="text" id="link" name="link" required><br>
+    </select><br><br> -->
+
+    <label for="link">Link:</label><br>
+    <input type="text" id="link" name="link" required><br>
+
+    <button type="submit">Create Listing</button>
+  </form>
 </body>
-</html>
+{% endblock %}
+<!-- </html> -->
