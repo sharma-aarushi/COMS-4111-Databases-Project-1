@@ -1,0 +1,41 @@
+{% extends "index.html" %}
+{% block title %}LionTrade{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="p-5 hero-background"></div>
+    <section class="text-center container">
+        <div class="row py-lg-5">
+            <div class="col-lg-6 col-md-8 mx-auto">
+                <p class="lead text-muted">Discover your go-to marketplace for Columbia Lions! Swap textbooks, gear, and
+                    more, all from fellow students. Easy browsing, sustainable choices. Join the Community Exchange Now!
+                </p>
+                <p class="button-wrapper">
+                    <a href="{{ url_for('show_popular_listings') }}" class="btn btn-outline-dark btn-primary my-2">Start
+                        Exploring</a>
+                    <a href="{{ url_for('new_listing') }}" class="btn btn-secondary my-2">Create a Listing</a>
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Popular Items Section -->
+    <h2 class="text-center mb-4 welcome_Card">Popular Items</h2>
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        {% for item in popular_items %}
+        <div class="col">
+            <a href="{{ url_for('view_item', listing_id=item['listingid']) }}" class="card-link">
+                <div class="card h-100">
+                    <img src="{{ item['link'] }}" class="card-img-top" alt="{{ item['listing_title'] }}"
+                        style="height: 200px; object-fit: cover;">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ item['listing_title'] }}</h5>
+                        <p class="card-text">{{ item['times_added_to_wishlist'] }} wishlists</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
