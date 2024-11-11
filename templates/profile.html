@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Profile</title>
+</head>
+
+<body>
+    <h1>Your Listings</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Date Added</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for listing in listings %}
+            <tr>
+                <td>{{ listing.title }}</td>
+                <td>{{ listing.dateadded }}</td>
+                <td>
+                    <a href="{{ url_for('edit_listing', listing_id=listing.listingid) }}">✏️</a>
+                    <a href="{{ url_for('delete_listing', listing_id=listing.listingid) }}"
+                        onclick="return confirm('Are you sure?')">🗑️</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+
+</html>

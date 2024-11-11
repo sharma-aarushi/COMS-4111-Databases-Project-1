@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Messages</title>
+</head>
+
+<body>
+    <h1>Message History</h1>
+    <div>
+        {% for message in messages %}
+        <div class="{{ message.message_type }}">
+            <strong>{{ message.sender_name }}:</strong> {{ message.content }}
+            <small>{{ message.timestamp }}</small>
+        </div>
+        <hr>
+        {% endfor %}
+    </div>
+</body>
+
+</html>
