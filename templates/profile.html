@@ -7,7 +7,21 @@
 </head>
 
 <body>
-    <h1>Your Listings</h1>
+    <header>
+        <!-- Display the welcome message with the user's name -->
+        <h1>Welcome, {{ user_name }}!</h1>
+        <!-- Add navigation buttons -->
+        <nav>
+            <a href="{{ url_for('new_listing') }}">
+                <button>Create New Listing</button>
+            </a>
+            <a href="{{ url_for('show_popular_listings') }}">
+                <button>Home</button>
+            </a>
+        </nav>
+    </header>
+
+    <h2>Your Listings</h2>
     <table>
         <thead>
             <tr>
