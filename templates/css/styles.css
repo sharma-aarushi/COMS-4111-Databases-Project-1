@@ -27,3 +27,8 @@ button,
 input[type="submit"] {
     padding: 8px 12px;
 }
+
+.highlight {
+    background-color: yellow;
+    font-weight: bold;
+}

@@ -1,0 +1,34 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="container mt-3">
+    <h2>Search Results for "{{ keyword }}"</h2>
+
+    {% if results %}
+    <div class="row">
+        {% for item in results %}
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">
+                    <img src="{{ item.link }}" class="card-img-top" alt="{{ item.title }}"
+                        style="height: 200px; object-fit: cover;">
+                </a>
+                <div class="card-body">
+                    <!-- Highlight keyword in title -->
+                    <h5 class="card-title">
+                        <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">
+                            {{ item.title | highlight(keyword) }}
+                        </a>
+                    </h5>
+                    <!-- Highlight keyword in description -->
+                    <p class="card-text">{{ item.description | highlight(keyword, 100) }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p>No results found for "{{ keyword }}".</p>
+    {% endif %}
+</div>
+{% endblock %}

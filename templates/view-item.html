@@ -1,0 +1,62 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="container mt-3">
+    <div class="row">
+        <!-- Item Details - Left Side -->
+        <div class="col-md-8">
+            <!-- Item Title -->
+            <h2 class="welcome_Card">{{ item.title }}</h2>
+
+            <!-- Item Image -->
+            <div class="item-images mb-3">
+                <img src="{{ item.link }}" alt="{{ item.title }}" class="img-fluid"
+                    style="max-width: 100%; max-height: 400px; object-fit: contain;">
+            </div>
+
+            <!-- Item Description and Details -->
+            <div class="card-text">
+                <p>{{ item.description }}</p>
+            </div>
+
+            <!-- Item Attributes -->
+            <div class="card-text" style="color:#585858">
+                <p><strong>Condition:</strong> {{ item.condition }}</p>
+                <p><strong>Status:</strong> {{ item.status }}</p>
+                <p><strong>Category:</strong> <a href="{{ url_for('search', query=item.category) }}">{{ item.category
+                        }}</a></p>
+                <p><strong>Location:</strong> {{ item.location }}</p>
+                <p><strong>Date Added:</strong> {{ item.date_added }}</p>
+                <p><strong>Owned by:</strong> {{ item.owner_name }}</p>
+            </div>
+        </div>
+
+        <!-- Actions - Right Side -->
+        <div class="col-md-4">
+            <h5>Contact Owner</h5>
+
+            <!-- Message Seller Form -->
+            <form id="messageSellerForm" action="{{ url_for('message_seller', listing_id=item.listingid) }}"
+                method="post">
+                <div class="mb-3">
+                    <textarea id="message" name="message" class="form-control"
+                        placeholder="Message to {{ item.owner_name }}..."></textarea>
+                    <label for="message" class="card-text" style="display: block; text-align: right">(Optional)</label>
+                </div>
+                <button type="submit" class="btn btn-outline-dark mb-3">Send Message</button>
+            </form>
+
+            <!-- Add to Wishlist Button -->
+            <form id="addToWishlistForm" action="{{ url_for('add_to_wishlist', listing_id=item.listingid) }}"
+                method="post">
+                <button type="submit" class="btn btn-outline-primary mb-3">Add to Wishlist</button>
+            </form>
+
+            <!-- Buy Item Button -->
+            <form id="buyItemForm" action="{{ url_for('buy_item', listing_id=item.listingid) }}" method="post">
+                <button type="submit" class="btn btn-primary">Buy Now</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

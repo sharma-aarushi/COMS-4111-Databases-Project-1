@@ -8,7 +8,9 @@ from sqlalchemy.pool import NullPool
 from flask import Flask, request, render_template, g, redirect, Response, abort, jsonify
 from datetime import datetime
 from sqlalchemy import inspect, text
-
+from datetime import date
+import re
+from markupsafe import Markup
 
 # App setup
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
@@ -51,16 +53,19 @@ def show_popular_listings():
 
     return render_template("home.html", popular_items=popular_items)
 
-@app.route('/test')
-def test_page():
-    return "Flask is working!"
+# @app.route('/test')
+# def test_page():
+#     return "Flask is working!"
 
 @app.route('/view/<int:listing_id>')
 def view_item(listing_id):
+    # Query to get item details along with the owner's name
     query = text("""
-        SELECT title, location, category, creatorid, description, price, condition, status, link
-        FROM Listings
-        WHERE listingid = :listing_id
+        SELECT L.listingid, L.title, L.location, L.category, L.description, L.price, L.condition, 
+               L.status, L.link, L.dateadded, U.name AS owner_name
+        FROM Listings L
+        JOIN Users U ON L.createdby = U.uni
+        WHERE L.listingid = :listing_id
     """)
 
     with g.conn as conn:
@@ -70,11 +75,31 @@ def view_item(listing_id):
         flash("Listing not found.")
         return redirect(url_for('show_popular_listings'))
 
-    listing = dict(result)
-    return render_template("view-item.html", listing=listing)
+    # Convert the result to a dictionary-like object using _mapping
+    listing = result._mapping
+    return render_template("view-item.html", item=listing)
 
-@app.route('/create_listing', methods=['POST'])
-def create_listing():
+@app.route('/message_seller/<int:listing_id>', methods=['POST'])
+def message_seller(listing_id):
+    message = request.form.get('message')
+    # Logic to send the message to the seller
+    flash("Message sent to the seller.")
+    return redirect(url_for('view_item', listing_id=listing_id))
+
+@app.route('/add_to_wishlist/<int:listing_id>', methods=['POST'])
+def add_to_wishlist(listing_id):
+    # Logic to add item to wishlist
+    flash("Item added to wishlist.")
+    return redirect(url_for('view_item', listing_id=listing_id))
+
+@app.route('/buy_item/<int:listing_id>', methods=['POST'])
+def buy_item(listing_id):
+    # Logic to handle the purchase
+    flash("Purchase successful.")
+    return redirect(url_for('view_item', listing_id=listing_id))
+
+@app.route('/new_listing', methods=['POST'])
+def new_listing():
     title = request.form.get('title')
     location = request.form.get('location')
     category = request.form.get('category')
@@ -83,6 +108,9 @@ def create_listing():
     price = request.form.get('price')
     condition = request.form.get('condition')
     status = request.form.get('status')
+    
+    # Automatically set today's date
+    dateadded = date.today()
     
     if not all([title, location, category, creatorid, description, price, condition, status]):
         flash("All fields are required.")
@@ -95,8 +123,8 @@ def create_listing():
         return redirect('/new_listing')
 
     query = text("""
-        INSERT INTO Listings (title, location, category, creatorid, description, price, condition, status)
-        VALUES (:title, :location, :category, :creatorid, :description, :price, :condition, :status)
+        INSERT INTO Listings (title, location, category, creatorid, description, price, condition, status, dateadded)
+        VALUES (:title, :location, :category, :creatorid, :description, :price, :condition, :status, :dateadded)
     """)
 
     try:
@@ -109,7 +137,8 @@ def create_listing():
                 'description': description,
                 'price': price,
                 'condition': condition,
-                'status': status
+                'status': status,
+                'dateadded': dateadded
             })
             flash("Listing created successfully.")
     except Exception as e:
@@ -117,6 +146,52 @@ def create_listing():
         return redirect('/new_listing')
 
     return redirect('/')
+
+@app.route('/search')
+def search():
+    keyword = request.args.get('query', '').strip()
+    
+    if not keyword:
+        flash("Please enter a keyword to search.")
+        return redirect(url_for('show_popular_listings'))
+
+    # SQL query to search for the keyword in the relevant columns
+    query = text("""
+        SELECT listingid, title, description, link
+        FROM Listings
+        WHERE title ILIKE :kw 
+           OR location ILIKE :kw
+           OR category ILIKE :kw
+           OR description ILIKE :kw
+           OR condition::TEXT ILIKE :kw
+           OR status ILIKE :kw
+    """)
+
+    # Use wildcard % for partial matches with the keyword
+    search_keyword = f"%{keyword}%"
+
+    with g.conn as conn:
+        results = conn.execute(query, {'kw': search_keyword}).fetchall()
+
+    return render_template("search_results.html", keyword=keyword, results=results)
+
+# Register custom filter to highlight keywords
+@app.template_filter('highlight')
+def highlight(text, keyword, limit=None):
+    # Escape HTML in text
+    escaped_text = Markup.escape(text)
+    # Optional truncation
+    if limit and len(escaped_text) > limit:
+        escaped_text = escaped_text[:limit] + "..."
+
+    # Highlight the keyword using a span with custom styling
+    highlighted_text = re.sub(
+        f"({re.escape(keyword)})", 
+        r'<span class="highlight">\1</span>', 
+        escaped_text, 
+        flags=re.IGNORECASE
+    )
+    return Markup(highlighted_text)
 
 if __name__ == "__main__":
     import click
