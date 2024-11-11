@@ -14,14 +14,17 @@
                         style="height: 200px; object-fit: cover;">
                 </a>
                 <div class="card-body">
-                    <!-- Highlight keyword in title -->
+                    <!-- Highlight keyword in title and mark it as safe -->
                     <h5 class="card-title">
                         <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">
-                            {{ item.title | highlight(keyword) }}
+                            {{ item.title | highlight(keyword) | replace('|||', '<span class="highlight">') |
+                                replace('|||', '</span>') }}
                         </a>
                     </h5>
-                    <!-- Highlight keyword in description -->
-                    <p class="card-text">{{ item.description | highlight(keyword, 100) }}</p>
+                    <p class="card-text">
+                        {{ item.description | highlight(keyword, 100) | replace('|||', '<span class="highlight">') |
+                            replace('|||', '</span>') }}
+                    </p>
                 </div>
             </div>
         </div>

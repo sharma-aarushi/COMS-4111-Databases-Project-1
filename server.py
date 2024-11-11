@@ -175,23 +175,74 @@ def search():
 
     return render_template("search_results.html", keyword=keyword, results=results)
 
-# Register custom filter to highlight keywords
+#TODO: Fix highlighting
 @app.template_filter('highlight')
 def highlight(text, keyword, limit=None):
-    # Escape HTML in text
-    escaped_text = Markup.escape(text)
     # Optional truncation
-    if limit and len(escaped_text) > limit:
-        escaped_text = escaped_text[:limit] + "..."
+    if limit and len(text) > limit:
+        text = text[:limit] + "..."
 
-    # Highlight the keyword using a span with custom styling
-    highlighted_text = re.sub(
-        f"({re.escape(keyword)})", 
-        r'<span class="highlight">\1</span>', 
-        escaped_text, 
-        flags=re.IGNORECASE
-    )
-    return Markup(highlighted_text)
+    # Escape keyword for any special characters and add markers around matches
+    pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+    highlighted_text = pattern.sub(r"|||<span class='highlight'>\g<0></span>|||", text)
+    
+    # Replace the markers to prevent direct HTML injection
+    return highlighted_text.replace("|||", "")
+
+
+
+######
+#USER TESTING
+######
+
+from datetime import datetime
+
+@app.route('/messages')
+def messages():
+    demo_uni = "demo_uni"  # Replace with actual demo user UNI
+    query = text("""
+        SELECT M.*, U.name AS sender_name, L.title AS listing_title
+        FROM Messages M
+        JOIN Users U ON M.sender_uni = U.uni
+        LEFT JOIN Listings L ON M.listing_id = L.listingid
+        WHERE M.sender_uni = :demo_uni OR M.receiver_uni = :demo_uni
+        ORDER BY M.timestamp DESC
+    """)
+    
+    with g.conn as conn:
+        result = conn.execute(query, {'demo_uni': demo_uni}).fetchall()
+    
+    messages = [dict(row._mapping) for row in result]
+    return render_template("messages.html", messages=messages, demo_uni=demo_uni)
+
+
+@app.route('/send_message', methods=['POST'])
+def send_message():
+    demo_uni = "demo_uni"  # Replace with actual demo user UNI
+    receiver_uni = request.form.get('receiver_uni')
+    listing_id = request.form.get('listing_id')
+    message_text = request.form.get('message')
+
+    if not receiver_uni or not message_text:
+        flash("Message and receiver are required.")
+        return redirect(request.referrer)
+
+    query = text("""
+        INSERT INTO Messages (sender_uni, receiver_uni, listing_id, message, timestamp)
+        VALUES (:sender_uni, :receiver_uni, :listing_id, :message, :timestamp)
+    """)
+
+    with g.conn as conn:
+        conn.execute(query, {
+            'sender_uni': demo_uni,
+            'receiver_uni': receiver_uni,
+            'listing_id': listing_id,
+            'message': message_text,
+            'timestamp': datetime.now()
+        })
+        flash("Message sent successfully.")
+    
+    return redirect(url_for('messages'))
 
 if __name__ == "__main__":
     import click
