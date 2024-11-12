@@ -353,7 +353,6 @@ def edit_listing(listing_id):
             flash("Listing not found or unauthorized.")
             return redirect(url_for('profile'))
 
-
 @app.route('/delete_listing/<int:listing_id>', methods=['POST'])
 def delete_listing(listing_id):
     demo_uni = "demo_uni"  # Demo user UNI for testing
@@ -361,11 +360,27 @@ def delete_listing(listing_id):
         DELETE FROM Listings 
         WHERE listingid = :listing_id AND createdby = :demo_uni
     """)
-    with g.conn as conn:
-        conn.execute(query, {'listing_id': listing_id, 'demo_uni': demo_uni})
-        flash("Listing deleted successfully.")
-    return redirect(url_for('profile'))
 
+    try:
+        with g.conn as conn:
+            # Debugging print to confirm route is accessed
+            print(f"Attempting to delete listing with ID {listing_id} for user {demo_uni}")
+            
+            # Execute delete query
+            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': demo_uni})
+            
+            # Commit the transaction
+            g.conn.commit()  # Explicitly commit the deletion
+            print(f"Deleted listing with ID {listing_id} for user {demo_uni}")  # Confirm deletion
+            
+            flash("Listing deleted successfully.")
+    except Exception as e:
+        # Print error message for debugging
+        print(f"An error occurred during deletion: {e}")
+        flash("An error occurred while trying to delete the listing.")
+    
+    return redirect(url_for('profile'))
+ 
 
 @app.route('/send_message', methods=['POST'])
 def send_message():
