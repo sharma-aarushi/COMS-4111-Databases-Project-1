@@ -152,22 +152,85 @@ def message_seller(listing_id):
     flash("Message sent to the seller.")
     return redirect(url_for('view_item', listing_id=listing_id))
 
+# Wishlist Route
+print("Wishlist route accessed")
+@app.route('/wishlist')
+def wishlist():
+    user_uni = get_current_user_id()  # Get current user ID
+    print(f"Fetching wishlist for user: {user_uni}")  # Debug statement
+    wishlist_items = get_wishlist_items(user_uni)  # Fetch wishlist items from the database
+    return render_template("wishlist.html", wishlist_items=wishlist_items)
+
+def get_current_user_id():
+    # Using a valid user ID from your users table for testing purposes
+    return "hd3722"  # Replace 'hd3722' with any valid user ID from your table
+
+def get_wishlist_items(user_uni):
+    # Query to retrieve wishlist items for the specified user
+    query = text("""
+        SELECT L.title, L.description, L.link, L.listingid
+        FROM Listings L
+        JOIN in_wishlist IW ON L.listingid = IW.listing_id
+        WHERE IW.uni = :user_uni
+    """)
+    try:
+        with g.conn as conn:
+            result = conn.execute(query, {'user_uni': user_uni}).fetchall()
+        return [dict(row._mapping) for row in result]
+    except Exception as e:
+        print(f"Error retrieving wishlist items for user {user_uni}: {e}")
+        return []
+
+def add_item_to_wishlist(user_uni, listing_id):
+    # Check if the item is already in the wishlist for the given user
+    check_query = text("""
+        SELECT 1
+        FROM in_wishlist
+        WHERE uni = :user_uni AND listing_id = :listing_id
+    """)
+    try:
+        with g.conn as conn:
+            # Execute the check query
+            result = conn.execute(check_query, {
+                'user_uni': user_uni,
+                'listing_id': listing_id
+            }).fetchone()
+            
+            # If the item already exists in the wishlist, flash a message and return
+            if result:
+                flash("Item is already in your wishlist.")
+                return
+
+            # If the item is not in the wishlist, proceed to add it
+            insert_query = text("""
+                INSERT INTO in_wishlist (uni, listing_id, dateadded) 
+                VALUES (:user_uni, :listing_id, :dateadded)
+            """)
+            conn.execute(insert_query, {
+                'user_uni': user_uni,
+                'listing_id': listing_id,
+                'dateadded': date.today()  # Adds the current date
+            })
+            g.conn.commit()
+            flash("Item successfully added to your wishlist.")
+    except Exception as e:
+        # Print any database errors for debugging purposes
+        print(f"Database error while adding item to wishlist: {e}")
+        raise
+
+
 @app.route('/add_to_wishlist/<int:listing_id>', methods=['POST'])
 def add_to_wishlist(listing_id):
     try:
         # Add the item to the user's wishlist in the database
         user_uni = get_current_user_id()  # Get current user uni
-        
         add_item_to_wishlist(user_uni, listing_id)  # Add to wishlist in the database
-        
-        # Flash a success message
-        flash("Item added to wishlist.")
-    
     except Exception as e:
         # Capture any exceptions, flash a message, and print the error for debugging
         flash(f"An error occurred while adding to wishlist: {str(e)}")
-        print(f"Error adding to wishlist: {str(e)}")  # This print is okay to keep for error handling
-
+        print(f"Error adding to wishlist: {str(e)}")
+    
+    # Redirect to the view item page after attempting to add to the wishlist
     return redirect(url_for('view_item', listing_id=listing_id))
 
 @app.route('/remove_from_wishlist/<int:listing_id>', methods=['POST'])
@@ -568,7 +631,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8115, type=int)
+    @click.argument('PORT', default=9115, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
