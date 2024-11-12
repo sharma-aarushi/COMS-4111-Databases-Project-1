@@ -16,8 +16,19 @@
       <li><a href="{{ url_for('show_popular_listings') }}">Home</a></li>
       <li><a href="{{ url_for('new_listing') }}">Create a Listing</a></li>
       <li><a href="{{ url_for('profile') }}">Profile</a></li>
-      <li><a href="{{ url_for('messages') }}">Messages</a></li>
+      <li><a href="{{ url_for('message_overview') }}">Messages</a></li>
     </ul>
+
+    <!-- User Selection Dropdown -->
+    <div class="dropdown">
+      <button class="dropbtn">Select User</button>
+      <div class="dropdown-content">
+        <a href="{{ url_for('switch_user', user='user1') }}">User 1</a>
+        <a href="{{ url_for('switch_user', user='user2') }}">User 2</a>
+      </div>
+    </div>
+
+    <!-- Search Form -->
     <form class="search-form" action="{{ url_for('search') }}" method="get">
       <input type="search" name="query" placeholder="Search" aria-label="Search" required>
       <button type="submit">Search</button>

@@ -1,0 +1,21 @@
+{% extends "index.html" %}
+
+{% block content %}
+<h2>Conversation with {{ recipient_uni }}</h2>
+
+<div class="messages">
+    {% for message in messages %}
+    <div class="message">
+        <p><strong>{{ 'You' if message.sender == current_user else recipient_uni }}:</strong> {{ message.content }}</p>
+        <small>{{ message.timestamp }}</small>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Form to send a new message in the conversation -->
+<form action="{{ url_for('send_message') }}" method="post">
+    <input type="hidden" name="receiver_uni" value="{{ recipient_uni }}">
+    <textarea name="message" placeholder="Type your message here..."></textarea>
+    <button type="submit">Send</button>
+</form>
+{% endblock %}

@@ -21,6 +21,24 @@ app.secret_key = 'your_secret_key'
 DATABASEURI = "postgresql://as6322:624309@104.196.222.236/proj1part2"
 engine = create_engine(DATABASEURI, poolclass=NullPool)
 
+# Define global users and current user
+USERS = {
+    "user1": "demo_uni",  # Replace with actual UNI for user1
+    "user2": "test_uni"   # Replace with actual UNI for user2
+}
+current_user = USERS["user1"]  # Default to user1
+
+@app.route('/switch_user/<string:user>')
+def switch_user(user):
+    global current_user
+    if user in USERS:
+        current_user = USERS[user]
+        flash(f"Switched to {user}.")
+    else:
+        flash("User not found.")
+    return redirect(url_for('profile'))
+
+
 @app.before_request
 def before_request():
     try:
@@ -98,76 +116,41 @@ def view_item(listing_id):
     listing = result._mapping
     return render_template("view-item.html", item=listing)
 
+
+##Messages
+
 @app.route('/message_seller/<int:listing_id>', methods=['POST'])
 def message_seller(listing_id):
     message = request.form.get('message')
-    # Logic to send the message to the seller
+    
+    # Query to get the seller's UNI (createdby) from the Listings table based on listing_id
+    query = text("SELECT createdby FROM Listings WHERE listingid = :listing_id")
+    
+    with g.conn as conn:
+        result = conn.execute(query, {'listing_id': listing_id}).fetchone()
+        
+        if result is None:
+            flash("Seller not found.")
+            return redirect(url_for('view_item', listing_id=listing_id))
+        
+        recipient_uni = result._mapping['createdby']  # Seller's UNI from the Listings table
+
+        # Insert the message into Messages table
+        insert_query = text("""
+            INSERT INTO Messages (content, timestamp, sender, receiver)
+            VALUES (:content, :timestamp, :sender, :receiver)
+        """)
+        
+        conn.execute(insert_query, {
+            'content': message,
+            'timestamp': datetime.now(),
+            'sender': current_user,
+            'receiver': recipient_uni
+        })
+        conn.commit()  # Commit the transaction
+
     flash("Message sent to the seller.")
     return redirect(url_for('view_item', listing_id=listing_id))
-
-def get_current_user_id():
-    # Using a valid user ID from your users table for testing purposes
-    return "hd3722"  # Replace 'hd3722' with any valid user ID from your table
-
-def add_item_to_wishlist(user_uni, listing_id):
-    # Check if the item is already in the wishlist for the given user
-    check_query = text("""
-        SELECT 1
-        FROM in_wishlist
-        WHERE uni = :user_uni AND listing_id = :listing_id
-    """)
-    try:
-        with g.conn as conn:
-            # Execute the check query
-            result = conn.execute(check_query, {
-                'user_uni': user_uni,
-                'listing_id': listing_id
-            }).fetchone()
-            
-            # If the item already exists in the wishlist, flash a message and return
-            if result:
-                flash("Item is already in your wishlist.")
-                return
-
-            # If the item is not in the wishlist, proceed to add it
-            insert_query = text("""
-                INSERT INTO in_wishlist (uni, listing_id, dateadded) 
-                VALUES (:user_uni, :listing_id, :dateadded)
-            """)
-            conn.execute(insert_query, {
-                'user_uni': user_uni,
-                'listing_id': listing_id,
-                'dateadded': date.today()  # Adds the current date
-            })
-            g.conn.commit()
-    except Exception as e:
-        # Print any database errors for debugging purposes
-        print(f"Database error while adding item to wishlist: {e}")
-        raise
-
-def get_wishlist_items(user_uni):
-    # Query to retrieve wishlist items for the specified user
-    query = text("""
-        SELECT L.title, L.description, L.link, L.listingid
-        FROM Listings L
-        JOIN in_wishlist IW ON L.listingid = IW.listing_id
-        WHERE IW.uni = :user_uni
-    """)
-    try:
-        with g.conn as conn:
-            result = conn.execute(query, {'user_uni': user_uni}).fetchall()
-        return [dict(row._mapping) for row in result]
-    except Exception as e:
-        print(f"Error retrieving wishlist items for user {user_uni}: {e}")
-        return []
-
-@app.route('/wishlist')
-def wishlist():
-    user_uni = get_current_user_id()  # Use current user ID
-    
-    wishlist_items = get_wishlist_items(user_uni)  # Get wishlist items from the database
-    
-    return render_template("wishlist.html", wishlist_items=wishlist_items)
 
 @app.route('/add_to_wishlist/<int:listing_id>', methods=['POST'])
 def add_to_wishlist(listing_id):
@@ -282,7 +265,6 @@ from sqlalchemy import text
 @app.route('/new_listing', methods=['GET', 'POST'])
 def new_listing():
     if request.method == 'POST':
-        # Get form data
         title = request.form.get('title')
         location = request.form.get('location')
         category = request.form.get('category')
@@ -291,24 +273,20 @@ def new_listing():
         condition = request.form.get('condition')
         status = request.form.get('status')
         link = request.form.get('link')
-        createdby = "demo_uni"  # Assigning demo user ID for testing
-        
-        # Automatically set today's date
+        createdby = current_user  # Assign current user ID
+
         dateadded = date.today()
 
-        # Check if all fields are provided
         if not all([title, location, category, description, price, condition, status, link]):
             flash("All fields, including the link, are required.")
             return redirect(url_for('new_listing'))
         
-        # Convert price to float and handle exceptions
         try:
             price = float(price)
         except ValueError:
             flash("Invalid price value.")
             return redirect(url_for('new_listing'))
 
-        # Insert listing into the database using text() with named parameters
         query = text("""
             INSERT INTO Listings (title, location, category, createdby, description, price, condition, status, link, dateadded)
             VALUES (:title, :location, :category, :createdby, :description, :price, :condition, :status, :link, :dateadded)
@@ -328,7 +306,7 @@ def new_listing():
                     'link': link,
                     'dateadded': dateadded
                 })
-                g.conn.commit()  # Explicitly call commit here
+                g.conn.commit()
                 flash("Listing created successfully.")
         except Exception as e:
             print(f"An error occurred during insertion: {e}")
@@ -337,7 +315,6 @@ def new_listing():
 
         return redirect(url_for('show_popular_listings'))
 
-    # Render the form to create a new listing
     return render_template("create_listing.html")
 
 
@@ -388,19 +365,16 @@ def highlight(text, keyword, limit=None):
 ######
 #USER TESTING
 ######
-
 @app.route('/profile')
 def profile():
-    user_uni = "demo_uni"  # Replace with session or actual user ID for real scenarios
+    user_uni = current_user  # Use the current user
 
-    # Reconnect if the connection is closed
     if g.conn is None:
         g.conn = engine.connect()
 
-    # Start a transaction to ensure commit handling
     with g.conn.begin() as transaction:
         try:
-            # Fetch listings for the user
+            # Fetch listings for the current user
             query = text("""
                 SELECT listingid, title, dateadded 
                 FROM Listings 
@@ -412,36 +386,51 @@ def profile():
             user_query = text("SELECT name FROM Users WHERE uni = :user_uni")
             user_name = g.conn.execute(user_query, {'user_uni': user_uni}).scalar()
 
-            # Explicitly commit the transaction if needed (not typically required for SELECT)
             transaction.commit()
-
         except Exception as e:
             print(f"Error during database transaction: {e}")
-            transaction.rollback()  # Rollback in case of error
+            transaction.rollback()
             flash("An error occurred while fetching the profile.")
             return redirect(url_for('show_popular_listings'))
 
     return render_template("profile.html", listings=listings, user_name=user_name)
 
-@app.route('/messages')
-def messages():
-    user_uni = "demo_uni"  # Replace with session or actual user ID for real scenarios
+@app.route('/messages', defaults={'listing_id': None})
+@app.route('/messages/<int:listing_id>')
+def messages(listing_id=None):
+    # If listing_id is provided, fetch the `recipient_uni` (seller) based on `createdby` attribute
+    recipient_uni = None
+    if listing_id:
+        query = text("SELECT createdby FROM Listings WHERE listingid = :listing_id")
+        with g.conn as conn:
+            result = conn.execute(query, {'listing_id': listing_id}).fetchone()
+            if result:
+                recipient_uni = result._mapping['createdby']
+
+    if not recipient_uni:
+        flash("Recipient not found.")
+        return redirect(url_for('message_overview'))
+
+    # Now that we have recipient_uni, fetch all messages between current_user and recipient_uni
     query = text("""
-        SELECT m.content, m.timestamp, u.name AS sender_name, 
-               CASE WHEN m.sender = :user_uni THEN 'sent' ELSE 'received' END AS message_type 
-        FROM Messages m
-        JOIN Users u ON (m.sender = u.uni OR m.receiver = u.uni)
-        WHERE (m.sender = :user_uni OR m.receiver = :user_uni)
-        ORDER BY m.timestamp DESC
+        SELECT content, timestamp, sender, receiver
+        FROM Messages
+        WHERE (sender = :current_user AND receiver = :recipient_uni) 
+           OR (sender = :recipient_uni AND receiver = :current_user)
+        ORDER BY timestamp ASC
     """)
+
     with g.conn as conn:
-        messages = conn.execute(query, {'user_uni': user_uni}).fetchall()
-    
-    return render_template("messages.html", messages=messages)
+        messages = conn.execute(query, {
+            'current_user': current_user,
+            'recipient_uni': recipient_uni
+        }).fetchall()
+
+    return render_template("messages.html", messages=messages, recipient_uni=recipient_uni)
 
 @app.route('/edit_listing/<int:listing_id>', methods=['GET', 'POST'])
 def edit_listing(listing_id):
-    demo_uni = "demo_uni"  # Replace with actual demo user UNI for testing
+    demo_uni = current_uni  # Replace with actual demo user UNI for testing
     if request.method == 'POST':
         # Get form data for editable fields
         title = request.form.get('title')
@@ -485,7 +474,7 @@ def edit_listing(listing_id):
                     'status': status,
                     'link': link,
                     'listing_id': listing_id,
-                    'demo_uni': demo_uni
+                    'demo_uni': current_uni
                 })
                 g.conn.commit()  # Explicitly call commit for the update
                 flash("Listing updated successfully.")
@@ -504,7 +493,7 @@ def edit_listing(listing_id):
         """)
         
         with g.conn as conn:
-            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': demo_uni}).fetchone()
+            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': current_uni}).fetchone()
         
         if result:
             listing = result._mapping  # Convert to dictionary-like object for template rendering
@@ -524,14 +513,14 @@ def delete_listing(listing_id):
     try:
         with g.conn as conn:
             # Debugging print to confirm route is accessed
-            print(f"Attempting to delete listing with ID {listing_id} for user {demo_uni}")
+            print(f"Attempting to delete listing with ID {listing_id} for user {current_uni}")
             
             # Execute delete query
-            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': demo_uni})
+            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': current_uni})
             
             # Commit the transaction
             g.conn.commit()  # Explicitly commit the deletion
-            print(f"Deleted listing with ID {listing_id} for user {demo_uni}")  # Confirm deletion
+            print(f"Deleted listing with ID {listing_id} for user {current_uni}")  # Confirm deletion
             
             flash("Listing deleted successfully.")
     except Exception as e:
@@ -541,32 +530,34 @@ def delete_listing(listing_id):
     
     return redirect(url_for('profile'))
  
-
 @app.route('/send_message', methods=['POST'])
 def send_message():
-    demo_uni = "demo_uni"  # Replace with actual demo user UNI
+    sender_uni = current_user  # Use the global current_user variable
     receiver_uni = request.form.get('receiver_uni')
-    listing_id = request.form.get('listing_id')
     message_text = request.form.get('message')
 
     if not receiver_uni or not message_text:
         flash("Message and receiver are required.")
         return redirect(request.referrer)
 
+    # SQL query to insert a new message
     query = text("""
-        INSERT INTO Messages (sender_uni, receiver_uni, listing_id, message, timestamp)
-        VALUES (:sender_uni, :receiver_uni, :listing_id, :message, :timestamp)
+        INSERT INTO Messages (content, timestamp, sender, receiver)
+        VALUES (:message_text, :timestamp, :sender_uni, :receiver_uni)
     """)
 
-    with g.conn as conn:
-        conn.execute(query, {
-            'sender_uni': demo_uni,
-            'receiver_uni': receiver_uni,
-            'listing_id': listing_id,
-            'message': message_text,
-            'timestamp': datetime.now()
-        })
-        flash("Message sent successfully.")
+    try:
+        with g.conn as conn:
+            conn.execute(query, {
+                'message_text': message_text,
+                'timestamp': datetime.now(),
+                'sender_uni': sender_uni,
+                'receiver_uni': receiver_uni
+            })
+            flash("Message sent successfully.")
+    except Exception as e:
+        print(f"An error occurred while sending the message: {e}")
+        flash("An error occurred while trying to send the message.")
     
     return redirect(url_for('messages'))
 
@@ -577,7 +568,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=5110, type=int)
+    @click.argument('PORT', default=8115, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
