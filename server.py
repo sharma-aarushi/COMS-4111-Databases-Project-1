@@ -116,12 +116,79 @@ def view_item(listing_id):
     listing = result._mapping
     return render_template("view-item.html", item=listing)
 
+
+##Messages
+
 @app.route('/message_seller/<int:listing_id>', methods=['POST'])
 def message_seller(listing_id):
     message = request.form.get('message')
-    # Logic to send the message to the seller
+    
+    # Query to get the seller's UNI (createdby) from the Listings table based on listing_id
+    query = text("SELECT createdby FROM Listings WHERE listingid = :listing_id")
+    
+    with g.conn as conn:
+        result = conn.execute(query, {'listing_id': listing_id}).fetchone()
+        
+        if result is None:
+            flash("Seller not found.")
+            return redirect(url_for('view_item', listing_id=listing_id))
+        
+        recipient_uni = result._mapping['createdby']  # Seller's UNI from the Listings table
+
+        # Insert the message into Messages table
+        insert_query = text("""
+            INSERT INTO Messages (content, timestamp, sender, receiver)
+            VALUES (:content, :timestamp, :sender, :receiver)
+        """)
+        
+        conn.execute(insert_query, {
+            'content': message,
+            'timestamp': datetime.now(),
+            'sender': current_user,
+            'receiver': recipient_uni
+        })
+        conn.commit()  # Commit the transaction
+
     flash("Message sent to the seller.")
     return redirect(url_for('view_item', listing_id=listing_id))
+
+@app.route('/messages_overview')
+def message_overview():
+    # Get unique conversations for the current user based on sender and receiver
+    query = text("""
+        SELECT DISTINCT CASE 
+            WHEN sender = :current_user THEN receiver 
+            ELSE sender 
+        END AS other_user
+        FROM Messages
+        WHERE sender = :current_user OR receiver = :current_user
+    """)
+    
+    with g.conn as conn:
+        conversations = conn.execute(query, {'current_user': current_user}).fetchall()
+
+    return render_template("message_overview.html", conversations=conversations)
+
+@app.route('/messages/<string:recipient_uni>')
+def view_conversation(recipient_uni):
+    # Query to fetch the conversation between the current user and recipient_uni
+    query = text("""
+        SELECT content, timestamp, sender, receiver
+        FROM Messages
+        WHERE (sender = :current_user AND receiver = :recipient_uni) 
+           OR (sender = :recipient_uni AND receiver = :current_user)
+        ORDER BY timestamp
+    """)
+
+    with g.conn as conn:
+        messages = conn.execute(query, {
+            'current_user': current_user,
+            'recipient_uni': recipient_uni
+        }).fetchall()
+
+    # Pass the messages and recipient information to the template
+    return render_template("view_conversation.html", messages=messages, recipient_uni=recipient_uni)
+##EO Messages
 
 @app.route('/add_to_wishlist/<int:listing_id>', methods=['POST'])
 def add_to_wishlist(listing_id):
@@ -317,21 +384,38 @@ def profile():
 
     return render_template("profile.html", listings=listings, user_name=user_name)
 
-@app.route('/messages')
-def messages():
-    user_uni = current_uni # Replace with session or actual user ID for real scenarios
+@app.route('/messages', defaults={'listing_id': None})
+@app.route('/messages/<int:listing_id>')
+def messages(listing_id=None):
+    # If listing_id is provided, fetch the `recipient_uni` (seller) based on `createdby` attribute
+    recipient_uni = None
+    if listing_id:
+        query = text("SELECT createdby FROM Listings WHERE listingid = :listing_id")
+        with g.conn as conn:
+            result = conn.execute(query, {'listing_id': listing_id}).fetchone()
+            if result:
+                recipient_uni = result._mapping['createdby']
+
+    if not recipient_uni:
+        flash("Recipient not found.")
+        return redirect(url_for('message_overview'))
+
+    # Now that we have recipient_uni, fetch all messages between current_user and recipient_uni
     query = text("""
-        SELECT m.content, m.timestamp, u.name AS sender_name, 
-               CASE WHEN m.sender = :user_uni THEN 'sent' ELSE 'received' END AS message_type 
-        FROM Messages m
-        JOIN Users u ON (m.sender = u.uni OR m.receiver = u.uni)
-        WHERE (m.sender = :user_uni OR m.receiver = :user_uni)
-        ORDER BY m.timestamp DESC
+        SELECT content, timestamp, sender, receiver
+        FROM Messages
+        WHERE (sender = :current_user AND receiver = :recipient_uni) 
+           OR (sender = :recipient_uni AND receiver = :current_user)
+        ORDER BY timestamp ASC
     """)
+
     with g.conn as conn:
-        messages = conn.execute(query, {'user_uni': user_uni}).fetchall()
-    
-    return render_template("messages.html", messages=messages)
+        messages = conn.execute(query, {
+            'current_user': current_user,
+            'recipient_uni': recipient_uni
+        }).fetchall()
+
+    return render_template("messages.html", messages=messages, recipient_uni=recipient_uni)
 
 @app.route('/edit_listing/<int:listing_id>', methods=['GET', 'POST'])
 def edit_listing(listing_id):
@@ -435,32 +519,34 @@ def delete_listing(listing_id):
     
     return redirect(url_for('profile'))
  
-
 @app.route('/send_message', methods=['POST'])
 def send_message():
-    demo_uni = "demo_uni"  # Replace with actual demo user UNI
+    sender_uni = current_user  # Use the global current_user variable
     receiver_uni = request.form.get('receiver_uni')
-    listing_id = request.form.get('listing_id')
     message_text = request.form.get('message')
 
     if not receiver_uni or not message_text:
         flash("Message and receiver are required.")
         return redirect(request.referrer)
 
+    # SQL query to insert a new message
     query = text("""
-        INSERT INTO Messages (sender_uni, receiver_uni, listing_id, message, timestamp)
-        VALUES (:sender_uni, :receiver_uni, :listing_id, :message, :timestamp)
+        INSERT INTO Messages (content, timestamp, sender, receiver)
+        VALUES (:message_text, :timestamp, :sender_uni, :receiver_uni)
     """)
 
-    with g.conn as conn:
-        conn.execute(query, {
-            'sender': current_uni,
-            'receiver': receiver_uni,
-            'listing_id': listing_id,
-            'message': message_text,
-            'timestamp': datetime.now()
-        })
-        flash("Message sent successfully.")
+    try:
+        with g.conn as conn:
+            conn.execute(query, {
+                'message_text': message_text,
+                'timestamp': datetime.now(),
+                'sender_uni': sender_uni,
+                'receiver_uni': receiver_uni
+            })
+            flash("Message sent successfully.")
+    except Exception as e:
+        print(f"An error occurred while sending the message: {e}")
+        flash("An error occurred while trying to send the message.")
     
     return redirect(url_for('messages'))
 
