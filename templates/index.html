@@ -12,7 +12,7 @@
   <!-- Navigation Menu -->
   <nav class="navbar">
     <a class="navbar-brand" href="{{ url_for('show_popular_listings') }}">Columbia Exchange</a>
-    <ul>
+    <ul class="nav-links">
       <li><a href="{{ url_for('show_popular_listings') }}">Home</a></li>
       <li><a href="{{ url_for('new_listing') }}">Create a Listing</a></li>
       <li><a href="{{ url_for('profile') }}">Profile</a></li>
@@ -22,7 +22,9 @@
       <input type="search" name="query" placeholder="Search" aria-label="Search" required>
       <button type="submit">Search</button>
     </form>
+    <a class="wishlist-button" href="{{ url_for('wishlist') }}">Wish List</a>
   </nav>
+
   <div class="container">
     {% block content %}{% endblock %}
   </div>

@@ -63,6 +63,7 @@
                 <button type="submit" class="btn btn-outline-primary mb-3">Add to Wishlist</button>
             </form>
 
+
             <!-- Buy Item Button - Displayed Only if Item is Available -->
             {% if item.status == 'available' %}
                 <form id="buyItemForm" action="{{ url_for('purchase_success', listing_id=item.listingid) }}" method="post">
