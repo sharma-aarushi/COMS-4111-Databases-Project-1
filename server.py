@@ -53,15 +53,6 @@ def show_popular_listings():
 
     return render_template("home.html", popular_items=popular_items)
 
-from sqlalchemy import text
-from flask import flash, render_template, g
-
-from sqlalchemy import text
-from flask import flash, render_template, g
-
-from sqlalchemy import text
-from flask import flash, render_template, g
-
 @app.route('/test')
 def test_page():
     try:
@@ -145,23 +136,17 @@ def new_listing():
         # Automatically set today's date
         dateadded = date.today()
 
-        # Print values for debugging
-        print("Form Data:", title, location, category, description, price, condition, status, link)
-        
         # Check if all fields are provided
         if not all([title, location, category, description, price, condition, status, link]):
-            flash("All fields are required.")
+            flash("All fields, including the link, are required.")
             return redirect(url_for('new_listing'))
         
         # Convert price to float and handle exceptions
         try:
             price = float(price)
-            print("Converted Price:", price)
         except ValueError:
             flash("Invalid price value.")
             return redirect(url_for('new_listing'))
-
-        print("Date Added:", dateadded)
 
         # Insert listing into the database using text() with named parameters
         query = text("""
@@ -170,36 +155,31 @@ def new_listing():
         """)
 
         try:
-            print("Attempting to execute the insert statement...")
-            
-            # Execute the query
-            g.conn.execute(query, {
-                'title': title,
-                'location': location,
-                'category': category,
-                'createdby': createdby,
-                'description': description,
-                'price': price,
-                'condition': condition,
-                'status': status,
-                'link': link,
-                'dateadded': dateadded
-            })
-            
-            # Commit the transaction
-            g.conn.commit()  # Explicitly call commit here
-
-            print("Insert successful, commit executed.")
-            flash("Listing created successfully.")
+            with g.conn as conn:
+                conn.execute(query, {
+                    'title': title,
+                    'location': location,
+                    'category': category,
+                    'createdby': createdby,
+                    'description': description,
+                    'price': price,
+                    'condition': condition,
+                    'status': status,
+                    'link': link,
+                    'dateadded': dateadded
+                })
+                g.conn.commit()  # Explicitly call commit here
+                flash("Listing created successfully.")
         except Exception as e:
             print(f"An error occurred during insertion: {e}")
-            flash(f"An error occurred while inserting data: {str(e)}")
+            flash("An error occurred while inserting data. Ensure all fields are correct.")
             return redirect(url_for('new_listing'))
 
         return redirect(url_for('show_popular_listings'))
 
     # Render the form to create a new listing
     return render_template("create_listing.html")
+
 
 @app.route('/search')
 def search():
@@ -299,29 +279,66 @@ def messages():
     
     return render_template("messages.html", messages=messages)
 
-
 @app.route('/edit_listing/<int:listing_id>', methods=['GET', 'POST'])
 def edit_listing(listing_id):
     demo_uni = "demo_uni"  # Replace with actual demo user UNI for testing
     if request.method == 'POST':
+        # Get form data for editable fields
         title = request.form.get('title')
+        location = request.form.get('location')
+        category = request.form.get('category')
         description = request.form.get('description')
+        price = request.form.get('price')
+        condition = request.form.get('condition')
+        status = request.form.get('status')
+        link = request.form.get('link')
         
+        # Ensure link is not left blank
+        if not link:
+            flash("The link field cannot be left blank.")
+            return redirect(url_for('edit_listing', listing_id=listing_id))
+        
+        # Convert price to float and handle exceptions
+        try:
+            price = float(price)
+        except ValueError:
+            flash("Invalid price value.")
+            return redirect(url_for('edit_listing', listing_id=listing_id))
+
+        # Update query only for the editable fields
         query = text("""
             UPDATE Listings
-            SET title = :title, description = :description
+            SET title = :title, location = :location, category = :category, description = :description,
+                price = :price, condition = :condition, status = :status, link = :link
             WHERE listingid = :listing_id AND createdby = :demo_uni
         """)
         
-        with g.conn as conn:
-            conn.execute(query, {'title': title, 'description': description, 'listing_id': listing_id, 'demo_uni': demo_uni})
-            flash("Listing updated successfully.")
-        
+        try:
+            with g.conn as conn:
+                conn.execute(query, {
+                    'title': title,
+                    'location': location,
+                    'category': category,
+                    'description': description,
+                    'price': price,
+                    'condition': condition,
+                    'status': status,
+                    'link': link,
+                    'listing_id': listing_id,
+                    'demo_uni': demo_uni
+                })
+                g.conn.commit()  # Explicitly call commit for the update
+                flash("Listing updated successfully.")
+        except Exception as e:
+            print(f"Error during update: {e}")
+            flash("An error occurred while updating the listing.")
+            return redirect(url_for('edit_listing', listing_id=listing_id))
+
         return redirect(url_for('profile'))
     else:
-        # Fetch current listing data for pre-filling the edit form
+        # Fetch current data for the listing for pre-filling the edit form, including `listingid` for the form action URL
         query = text("""
-            SELECT title, description
+            SELECT listingid, title, location, category, description, price, condition, status, link
             FROM Listings
             WHERE listingid = :listing_id AND createdby = :demo_uni
         """)
@@ -330,11 +347,12 @@ def edit_listing(listing_id):
             result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': demo_uni}).fetchone()
         
         if result:
-            listing = result._mapping
+            listing = result._mapping  # Convert to dictionary-like object for template rendering
             return render_template("edit_listing.html", listing=listing)
         else:
             flash("Listing not found or unauthorized.")
             return redirect(url_for('profile'))
+
 
 @app.route('/delete_listing/<int:listing_id>', methods=['POST'])
 def delete_listing(listing_id):
