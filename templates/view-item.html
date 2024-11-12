@@ -2,6 +2,18 @@
 
 {% block content %}
 <div class="container mt-3">
+
+    <!-- Flash Messages Section -->
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-success" role="alert">
+                {% for message in messages %}
+                    {{ message }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <div class="row">
         <!-- Item Details - Left Side -->
         <div class="col-md-8">
@@ -27,7 +39,7 @@
                         }}</a></p>
                 <p><strong>Price:</strong> ${{ item.price }}</p>
                 <p><strong>Location:</strong> {{ item.location }}</p>
-                <p><strong>Date Added:</strong> {{ item.date_added }}</p>
+                <p><strong>Date Added:</strong> {{ item.dateadded }}</p>
                 <p><strong>Seller:</strong> {{ item.owner_name }}</p>
             </div>
         </div>
@@ -37,8 +49,7 @@
             <h5>Contact Owner</h5>
 
             <!-- Message Seller Form -->
-            <form id="messageSellerForm" action="{{ url_for('message_seller', listing_id=item.listingid) }}"
-                method="post">
+            <form id="messageSellerForm" action="{{ url_for('message_seller', listing_id=item.listingid) }}" method="post">
                 <div class="mb-3">
                     <textarea id="message" name="message" class="form-control"
                         placeholder="Message to {{ item.owner_name }}..."></textarea>
@@ -48,15 +59,20 @@
             </form>
 
             <!-- Add to Wishlist Button -->
-            <form id="addToWishlistForm" action="{{ url_for('add_to_wishlist', listing_id=item.listingid) }}"
-                method="post">
+            <form id="addToWishlistForm" action="{{ url_for('add_to_wishlist', listing_id=item.listingid) }}" method="post">
                 <button type="submit" class="btn btn-outline-primary mb-3">Add to Wishlist</button>
             </form>
 
-            <!-- Buy Item Button -->
-            <form id="buyItemForm" action="{{ url_for('buy_item', listing_id=item.listingid) }}" method="post">
-                <button type="submit" class="btn btn-primary">Buy Now</button>
-            </form>
+            <!-- Buy Item Button - Displayed Only if Item is Available -->
+            {% if item.status == 'available' %}
+                <form id="buyItemForm" action="{{ url_for('purchase_success', listing_id=item.listingid) }}" method="post">
+                    <input type="hidden" name="buyer_uni" value="guest_user">
+                    <input type="hidden" name="amount" value="{{ item.price }}">
+                    <button type="submit" class="btn btn-primary">Buy Now</button>
+                </form>
+            {% else %}
+                <p class="text-danger">This item is not available for purchase.</p>
+            {% endif %}
         </div>
     </div>
 </div>

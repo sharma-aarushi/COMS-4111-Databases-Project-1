@@ -76,7 +76,7 @@ def test_page():
     
     return render_template("create_listing.html")
 
-@app.route('/view/<int:listing_id>')
+@app.route('//<int:listing_id>')
 def view_item(listing_id):
     # Query to get item details along with the owner's name
     query = text("""
@@ -113,9 +113,56 @@ def add_to_wishlist(listing_id):
 
 @app.route('/buy_item/<int:listing_id>', methods=['POST'])
 def buy_item(listing_id):
-    # Logic to handle the purchase
-    flash("Purchase successful.")
-    return redirect(url_for('view_item', listing_id=listing_id))
+    # Check the status before proceeding
+    query = text("SELECT status FROM Listings WHERE listingid = :listing_id")
+    with g.conn as conn:
+        status = conn.execute(query, {'listing_id': listing_id}).scalar()
+
+    if status == 'sold':
+        flash("Sorry, this item is already sold.")
+        return redirect(url_for('view_item', listing_id=listing_id))
+
+    # Update the status to 'sold'
+    update_query = text("""
+        UPDATE Listings
+        SET status = 'sold'
+        WHERE listingid = :listing_id AND status = 'available'
+    """)
+
+    with g.conn as conn:
+        result = conn.execute(update_query, {'listing_id': listing_id})
+        if result.rowcount > 0:
+            g.conn.commit()
+            return redirect(url_for('purchase_success', listing_id=listing_id))
+        else:
+            flash("An error occurred while processing your purchase.")
+            return redirect(url_for('view_item', listing_id=listing_id))
+
+@app.route('/purchase_success/<int:listing_id>',methods=['POST'])
+def purchase_success(listing_id):
+    # Flash a success message
+    flash("Purchase completed successfully!")
+    
+    # Query to get item details using listing_id
+    query = text("""
+        SELECT title, price, description, link
+        FROM Listings
+        WHERE listingid = :listing_id
+    """)
+    
+    with g.conn as conn:
+        result = conn.execute(query, {'listing_id': listing_id}).fetchone()
+    
+    if result is None:
+        flash("Listing not found.")
+        return redirect(url_for('show_popular_listings'))
+    
+    listing = result._mapping  # Convert to dictionary-like object
+    
+    # Render the purchase_success.html template, passing listing details
+    return render_template("purchase_success.html", item=listing)
+
+
 
 from sqlalchemy import text
 
@@ -417,9 +464,10 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8114, type=int)
+    @click.argument('PORT', default=5110, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
         app.run(host=HOST, port=PORT, debug=debug, threaded=threaded)
     run()
+

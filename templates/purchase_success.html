@@ -1,0 +1,25 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="container mt-3">
+
+    <!-- Flash Messages Section -->
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-success" role="alert">
+                {% for message in messages %}
+                    {{ message }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <h2 class="text-success">Congratulations!</h2>
+    <p>Your purchase of <strong>{{ item.title }}</strong> was successful.</p>
+    <p>Please reach out to the seller to arrange a pickup at your convenience.</p>
+    
+    <!-- Button to Return to Listings -->
+    <a href="{{ url_for('show_popular_listings') }}" class="btn btn-primary mt-3">Return to Listings</a>
+
+</div>
+{% endblock %}
