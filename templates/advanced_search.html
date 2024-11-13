@@ -1,0 +1,59 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="container mt-3">
+    <h1>Advanced Search</h1>
+    <form action="{{ url_for('advanced_search') }}" method="get">
+        <!-- Keyword -->
+        <div class="form-group">
+            <label for="query">Keyword:</label>
+            <input type="text" id="query" name="query" class="form-control" placeholder="Enter a keyword">
+        </div>
+
+        <!-- Location -->
+        <div class="form-group">
+            <label for="location">Location:</label>
+            <input type="text" id="location" name="location" class="form-control" placeholder="Enter location">
+        </div>
+
+        <!-- Price Range -->
+        <div class="form-group">
+            <label for="min_price">Min Price:</label>
+            <input type="number" id="min_price" name="min_price" class="form-control" step="0.01" placeholder="0">
+        </div>
+        <div class="form-group">
+            <label for="max_price">Max Price:</label>
+            <input type="number" id="max_price" name="max_price" class="form-control" step="0.01" placeholder="1000">
+        </div>
+
+        <!-- Condition -->
+        <div class="form-group">
+            <label for="condition">Condition:</label>
+            <select id="condition" name="condition" class="form-control">
+                <option value="">Any</option>
+                <option value="new">New</option>
+                <option value="used">Used</option>
+                <option value="refurbished">Refurbished</option>
+            </select>
+        </div>
+
+        <!-- Status -->
+        <div class="form-group">
+            <label for="status">Status:</label>
+            <select id="status" name="status" class="form-control">
+                <option value="">Any</option>
+                <option value="available">Available</option>
+                <option value="sold">Sold</option>
+            </select>
+        </div>
+
+        <!-- Date Added -->
+        <div class="form-group">
+            <label for="date_added">Date Added After:</label>
+            <input type="date" id="date_added" name="date_added" class="form-control">
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-3">Search</button>
+    </form>
+</div>
+{% endblock %}
