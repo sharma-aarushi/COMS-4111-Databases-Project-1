@@ -68,7 +68,8 @@
 
             <!-- Buy Item Button - Displayed Only if Item is Available -->
             {% if item.status == 'available' %}
-            <form id="buyItemForm" action="{{ url_for('purchase_success', listing_id=item.listingid) }}" method="post">
+            <form id="buyItemForm" action="{{ url_for('buy_item', listing_id=item.listingid) }}" method="post">
+                <button type="submit">Buy Item</button>
                 <input type="hidden" name="buyer_uni" value="guest_user">
                 <input type="hidden" name="amount" value="{{ item.price }}">
                 <button type="submit" class="btn btn-primary">Buy Now</button>
