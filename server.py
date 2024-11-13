@@ -419,7 +419,7 @@ def messages(listing_id=None):
 
 @app.route('/edit_listing/<int:listing_id>', methods=['GET', 'POST'])
 def edit_listing(listing_id):
-    demo_uni = current_uni  # Replace with actual demo user UNI for testing
+    demo_uni = current_user  # Replace with actual demo user UNI for testing
     if request.method == 'POST':
         # Get form data for editable fields
         title = request.form.get('title')
@@ -463,7 +463,7 @@ def edit_listing(listing_id):
                     'status': status,
                     'link': link,
                     'listing_id': listing_id,
-                    'demo_uni': current_uni
+                    'demo_uni': current_user
                 })
                 g.conn.commit()  # Explicitly call commit for the update
                 flash("Listing updated successfully.")
@@ -482,7 +482,7 @@ def edit_listing(listing_id):
         """)
         
         with g.conn as conn:
-            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': current_uni}).fetchone()
+            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': current_user}).fetchone()
         
         if result:
             listing = result._mapping  # Convert to dictionary-like object for template rendering
@@ -502,14 +502,14 @@ def delete_listing(listing_id):
     try:
         with g.conn as conn:
             # Debugging print to confirm route is accessed
-            print(f"Attempting to delete listing with ID {listing_id} for user {current_uni}")
+            print(f"Attempting to delete listing with ID {listing_id} for user {current_user}")
             
             # Execute delete query
-            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': current_uni})
+            result = conn.execute(query, {'listing_id': listing_id, 'demo_uni': current_user})
             
             # Commit the transaction
             g.conn.commit()  # Explicitly commit the deletion
-            print(f"Deleted listing with ID {listing_id} for user {current_uni}")  # Confirm deletion
+            print(f"Deleted listing with ID {listing_id} for user {current_user}")  # Confirm deletion
             
             flash("Listing deleted successfully.")
     except Exception as e:
@@ -557,7 +557,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8115, type=int)
+    @click.argument('PORT', default=8116, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
