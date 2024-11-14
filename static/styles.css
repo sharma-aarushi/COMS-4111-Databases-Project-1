@@ -327,3 +327,41 @@ th {
     max-height: 200px;
     /* Optional: sets a max height to limit image height */
 }
+
+.wishlist-img {
+    width: 100%;
+    /* Set to 100% of the parent container width */
+    height: 200px;
+    /* Fixed height to maintain uniformity */
+    object-fit: cover;
+    /* Scales the image to cover the set dimensions without distortion */
+}
+
+.messages {
+    margin-top: 20px;
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-radius: 8px;
+    max-width: 80%;
+}
+
+.user-message {
+    background-color: #d1e7dd;
+    align-self: flex-end;
+    text-align: right;
+}
+
+.recipient-message {
+    background-color: #f8d7da;
+    align-self: flex-start;
+    text-align: left;
+}
+
+small {
+    display: block;
+    font-size: 0.8em;
+    color: #6c757d;
+}

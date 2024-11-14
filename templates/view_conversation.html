@@ -5,17 +5,20 @@
 
 <div class="messages">
     {% for message in messages %}
-    <div class="message">
-        <p><strong>{{ 'You' if message.sender == current_user else recipient_uni }}:</strong> {{ message.content }}</p>
+    <div class="message {% if message.sender == current_user %}user-message{% else %}recipient-message{% endif %}">
+        <p><strong>{{ 'You' if message.sender == current_user else (message.sender or 'Unknown Sender') }}:</strong> {{
+            message.content }}</p>
         <small>{{ message.timestamp }}</small>
     </div>
     {% endfor %}
 </div>
 
 <!-- Form to send a new message in the conversation -->
-<form action="{{ url_for('send_message') }}" method="post">
+<!-- Form to send a new message in the conversation -->
+<form action="{{ url_for('send_message', listing_id=listing_id) }}" method="post">
     <input type="hidden" name="receiver_uni" value="{{ recipient_uni }}">
-    <textarea name="message" placeholder="Type your message here..."></textarea>
+    <input type="hidden" name="listing_id" value="{{ listing_id }}">
+    <textarea name="message" placeholder="Type your message here..." required></textarea>
     <button type="submit">Send</button>
 </form>
 {% endblock %}

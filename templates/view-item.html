@@ -45,14 +45,13 @@
             <h5>Contact Owner</h5>
 
             <!-- Message Seller Form -->
-            <form id="messageSellerForm" action="{{ url_for('message_seller', listing_id=item.listingid) }}"
-                method="post">
-                <div class="mb-3">
-                    <textarea id="message" name="message" class="form-control"
-                        placeholder="Message to {{ item.owner_name }}..."></textarea>
-                    <label for="message" class="card-text" style="display: block; text-align: right">(Optional)</label>
+            <form action="{{ url_for('message_seller', listing_id=listing_id) }}" method="post">
+                <input type="hidden" name="recipient_uni" value="{{ seller_uni }}">
+                <div>
+                    <label for="message">Your Message:</label>
+                    <textarea name="message" id="message" required></textarea>
                 </div>
-                <button type="submit" class="btn btn-outline-dark mb-3">Send Message</button>
+                <button type="submit">Send Message</button>
             </form>
 
             <!-- Add to Wishlist Button -->

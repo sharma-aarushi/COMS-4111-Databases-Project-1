@@ -3,6 +3,7 @@
 {% block content %}
 <div class="container mt-3">
     <h1>Advanced Search</h1>
+    <h2>Search Results{% if keyword %} for "{{ keyword }}"{% endif %}</h2>
     <form action="{{ url_for('advanced_search') }}" method="get">
         <!-- Keyword -->
         <div class="form-group">
@@ -53,11 +54,12 @@
             <input type="date" id="date_added" name="date_added" class="form-control">
         </div>
 
-        <!-- Creator UNI -->
+        <!-- Creator Name -->
         <div class="form-group">
-            <label for="createdby">Created By (UNI):</label>
-            <input type="text" id="createdby" name="createdby" placeholder="Enter creator's UNI">
+            <label for="createdby">Created By (Name):</label>
+            <input type="text" id="createdby" name="createdby" placeholder="Enter creator's name">
         </div>
+
         <button type="submit" class="btn btn-primary mt-3">Search</button>
     </form>
 </div>

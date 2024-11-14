@@ -11,7 +11,7 @@
                     <div class="card">
                         <!-- Redirects to the view_item page when clicked -->
                         <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="stretched-link text-decoration-none text-dark">
-                            <img src="{{ item.link }}" class="card-img-top" alt="{{ item.title }}" style="max-height: 200px; object-fit: cover;">
+                            <img src="{{ item.link }}" class="card-img-top wishlist-img" alt="{{ item.title }}">
                         </a>
                         <div class="card-body">
                             <h5 class="card-title">{{ item.title }}</h5>

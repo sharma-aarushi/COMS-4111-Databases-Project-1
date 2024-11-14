@@ -2,12 +2,11 @@
 
 {% block content %}
 <h2>Your Conversations</h2>
-<ul>
+<ul class="conversations">
     {% for conversation in conversations %}
     <li>
         <a href="{{ url_for('view_conversation', recipient_uni=conversation.other_user) }}">
-            Conversation with {{ 'Deleted User' if conversation.other_user == 'deleted user' else
-            conversation.other_user }}
+            View conversation with {{ conversation.other_user }}
         </a>
     </li>
     {% endfor %}

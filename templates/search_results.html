@@ -2,7 +2,17 @@
 
 {% block content %}
 <div class="container mt-3">
-    <h2>Search Results for "{{ keyword }}"</h2>
+    <h2>
+        {% if keyword and keyword != "Advanced Search" and keyword != "All Listings" %}
+            Search Results for "{{ keyword }}"
+        {% elif keyword == "Advanced Search" %}
+            Advanced Search Results
+        {% elif keyword == "All Listings" %}
+            All Listings
+        {% else %}
+            Search Results
+        {% endif %}
+    </h2>
 
     {% if results %}
     <div class="row">
@@ -11,10 +21,9 @@
             <div class="card">
                 <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">
                     <img src="{{ item.link }}" class="card-img-top" alt="{{ item.title }}"
-                        style="height: 200px; object-fit: cover;">
+                         style="height: 200px; object-fit: cover;">
                 </a>
                 <div class="card-body">
-                    <!-- Apply the highlight filter directly -->
                     <h5 class="card-title">
                         <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">
                             {{ item.title | highlight(keyword) }}
@@ -23,13 +32,16 @@
                     <p class="card-text">
                         {{ item.description | highlight(keyword) }}
                     </p>
+                    <p><strong>Seller:</strong>
+                        <a href="{{ url_for('search', query=item.createdby) }}">{{ item.createdby }}</a>
+                    </p>
                 </div>
             </div>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <p>No results found for "{{ keyword }}".</p>
+    <p>No results found{% if keyword and keyword != "All Listings" %} for "{{ keyword }}"{% endif %}.</p>
     {% endif %}
 </div>
 {% endblock %}

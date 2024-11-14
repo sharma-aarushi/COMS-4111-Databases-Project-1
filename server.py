@@ -139,7 +139,7 @@ def profile():
 def view_item(listing_id):
     query = text("""
         SELECT L.listingid, L.title, L.location, L.category, L.description, L.price, L.condition, 
-               L.status, L.link, L.dateadded, U.name AS owner_name
+               L.status, L.link, L.dateadded, U.name AS owner_name, L.createdby AS seller_uni
         FROM Listings L
         JOIN Users U ON L.createdby = U.uni
         WHERE L.listingid = :listing_id
@@ -153,9 +153,8 @@ def view_item(listing_id):
         return redirect(url_for('show_popular_listings'))
 
     listing = result._mapping
-    return render_template("view-item.html", item=listing)
+    return render_template("view-item.html", item=listing, listing_id=listing['listingid'], seller_uni=listing['seller_uni'])
 
-# Wishlist route
 # Wishlist route
 @app.route('/wishlist')
 def wishlist():
@@ -470,43 +469,38 @@ def delete_listing(listing_id):
 # Message seller
 @app.route('/message_seller/<int:listing_id>', methods=['POST'])
 def message_seller(listing_id):
-    user_uni = get_current_user()
-    if not user_uni:
-        flash("Please log in to send a message to the seller.")
+    if not is_logged_in():
+        flash("Please log in to send a message.")
         return redirect(url_for('login'))
 
-    message = request.form.get('message')
-    query = text("SELECT createdby FROM Listings WHERE listingid = :listing_id")
+    sender = get_current_user()  # Get the logged-in user's UNI
+    recipient = request.form.get('recipient_uni')  # Seller's UNI from form data
+    message_content = request.form.get('message')
 
-    with g.conn as conn:
-        result = conn.execute(query, {'listing_id': listing_id}).fetchone()
+    if not message_content:
+        flash("Message cannot be empty.")
+        return redirect(url_for('view_item', listing_id=listing_id))
 
-        if result is None:
-            flash("Seller not found.")
-            return redirect(url_for('view_item', listing_id=listing_id))
+    # Insert the message into the Messages table
+    insert_query = text("""
+        INSERT INTO Messages (content, timestamp, sender, receiver)
+        VALUES (:content, :timestamp, :sender, :receiver)
+    """)
 
-        recipient_uni = result._mapping['createdby']
+    try:
+        with g.conn as conn:
+            conn.execute(insert_query, {
+                'content': message_content,
+                'timestamp': datetime.now(),
+                'sender': sender,
+                'receiver': recipient
+            })
+            conn.commit()
+            flash("Message sent to the seller.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        flash("Failed to send the message.")
 
-        # Check if the recipient is marked as 'deleted user'
-        if recipient_uni == 'deleted user':
-            flash("You cannot send a message to a deleted user.")
-            return redirect(url_for('view_item', listing_id=listing_id))
-
-        # Insert the message into the Messages table
-        insert_query = text("""
-            INSERT INTO Messages (content, timestamp, sender, receiver)
-            VALUES (:content, :timestamp, :sender, :receiver)
-        """)
-
-        conn.execute(insert_query, {
-            'content': message,
-            'timestamp': datetime.now(),
-            'sender': user_uni,
-            'receiver': recipient_uni
-        })
-        conn.commit()
-
-    flash("Message sent to the seller.")
     return redirect(url_for('view_item', listing_id=listing_id))
 
 @app.route('/message_overview')
@@ -529,31 +523,111 @@ def message_overview():
     with g.conn as conn:
         conversations = conn.execute(query, {'user_uni': user_uni}).fetchall()
 
-    return render_template("message_overview.html", conversations=conversations)
+    return render_template("message_overview.html", conversations=conversations)    
 
-@app.route('/messages/<string:recipient_uni>')
+@app.route('/view_conversation/<string:recipient_uni>')
 def view_conversation(recipient_uni):
+    # Get the current user
     user_uni = get_current_user()
     if not user_uni:
-        flash("Please log in to view messages.")
+        flash("Please log in to view conversations.")
         return redirect(url_for('login'))
 
-    # Query to fetch the conversation between current_user and recipient_uni
+    # Fetch messages between the current user and the recipient
     query = text("""
         SELECT content, timestamp, sender, receiver
         FROM Messages
-        WHERE (sender = :user_uni AND receiver = :recipient_uni) 
-           OR (sender = :recipient_uni AND receiver = :user_uni)
-        ORDER BY timestamp
+        WHERE (sender = :current_user AND receiver = :recipient_uni) 
+           OR (sender = :recipient_uni AND receiver = :current_user)
+        ORDER BY timestamp ASC
+    """)
+    
+    with g.conn as conn:
+        result = conn.execute(query, {
+            'current_user': user_uni,
+            'recipient_uni': recipient_uni
+        })
+
+        # Use row._mapping to create a list of dictionaries
+        messages = [row._mapping for row in result]
+
+    return render_template("messages.html", messages=messages, recipient_uni=recipient_uni)
+
+@app.route('/send_message/<int:listing_id>', methods=['POST'])
+def send_message(listing_id):
+    # Check if the user is logged in
+    if not is_logged_in():
+        flash("Please log in to send a message.")
+        return redirect(url_for('login'))
+
+    sender = get_current_user()  # Get the logged-in user's UNI
+    recipient = request.form.get('receiver_uni')  # UNI of the other party
+    message_content = request.form.get('message')
+
+    if not message_content:
+        flash("Message cannot be empty.")
+        return redirect(url_for('view_item', listing_id=listing_id))
+
+    # Insert the message into the Messages table
+    insert_query = text("""
+        INSERT INTO Messages (content, timestamp, sender, receiver)
+        VALUES (:content, :timestamp, :sender, :receiver)
     """)
 
+    try:
+        with g.conn as conn:
+            conn.execute(insert_query, {
+                'content': message_content,
+                'timestamp': datetime.now(),
+                'sender': sender,
+                'receiver': recipient
+            })
+            conn.commit()
+            flash("Message sent successfully.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        flash("Failed to send the message.")
+
+    # Redirect back to the conversation view
+    return redirect(url_for('view_conversation', recipient_uni=recipient))
+
+@app.route('/messages', defaults={'listing_id': None})
+@app.route('/messages/<int:listing_id>')
+def messages(listing_id=None):
+    # Check if the user is logged in
+    if not current_user:
+        flash("Please log in to view messages.")
+        return redirect(url_for('login'))
+
+    # If listing_id is provided, fetch the `recipient_uni` (seller) based on `createdby` attribute
+    recipient_uni = None
+    if listing_id:
+        query = text("SELECT createdby FROM Listings WHERE listingid = :listing_id")
+        with g.conn as conn:
+            result = conn.execute(query, {'listing_id': listing_id}).fetchone()
+            if result:
+                recipient_uni = result._mapping['createdby']
+
+    # If recipient_uni is not found, redirect to message overview
+    if not recipient_uni:
+        flash("Recipient not found.")
+        return redirect(url_for('message_overview'))
+
+    # Now that we have recipient_uni, fetch all messages between current_user and recipient_uni
+    query = text("""
+        SELECT content, timestamp, sender, receiver
+        FROM Messages
+        WHERE (sender = :current_user AND receiver = :recipient_uni) 
+           OR (sender = :recipient_uni AND receiver = :current_user)
+        ORDER BY timestamp ASC
+    """)
     with g.conn as conn:
         messages = conn.execute(query, {
-            'user_uni': user_uni,
+            'current_user': current_user,
             'recipient_uni': recipient_uni
         }).fetchall()
 
-    return render_template("view_conversation.html", messages=messages, recipient_uni=recipient_uni)
+    return render_template("messages.html", messages=messages, recipient_uni=recipient_uni)
 
 # Search function
 @app.route('/search', methods=['GET'])
@@ -579,7 +653,6 @@ def search():
 
     return render_template("search_results.html", keyword=keyword, results=results)
 
-# Advanced search function
 # Advanced search function
 @app.route('/advanced_search', methods=['GET'])
 def advanced_search():
@@ -651,7 +724,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8119, type=int)
+    @click.argument('PORT', default=8124, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
