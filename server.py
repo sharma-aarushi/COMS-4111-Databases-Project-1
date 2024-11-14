@@ -11,6 +11,7 @@ from sqlalchemy import inspect, text
 from datetime import date
 import re
 from markupsafe import Markup
+from datetime import date
 
 # App setup
 tmpl_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
@@ -216,6 +217,8 @@ def remove_from_wishlist(listing_id):
     return redirect(url_for('wishlist'))
     
 # Buy item
+from datetime import date  # Ensure date is imported
+
 @app.route('/buy_item/<int:listing_id>', methods=['POST'])
 def buy_item(listing_id):
     user_uni = get_current_user()
@@ -223,31 +226,54 @@ def buy_item(listing_id):
         flash("Please log in to purchase an item.")
         return redirect(url_for('login'))
 
-    # Check the status before proceeding
-    query = text("SELECT status FROM Listings WHERE listingid = :listing_id")
-    with g.conn as conn:
-        status = conn.execute(query, {'listing_id': listing_id}).scalar()
+    try:
+        with g.conn as conn:
+            # Retrieve item details to verify and fetch necessary transaction data
+            item_query = text("SELECT title, status, price, createdby FROM Listings WHERE listingid = :listing_id")
+            item = conn.execute(item_query, {'listing_id': listing_id}).fetchone()
 
-    if status == 'sold':
-        flash("Sorry, this item is already sold.")
+            if item is None:
+                flash("Listing not found.")
+                return redirect(url_for('show_popular_listings'))
+
+            if item.status == 'sold':
+                flash("Sorry, this item is already sold.")
+                return redirect(url_for('view_item', listing_id=listing_id))
+
+            # Update the listing status to 'sold'
+            update_query = text("""
+                UPDATE Listings
+                SET status = 'sold'
+                WHERE listingid = :listing_id AND status = 'available'
+            """)
+            result = conn.execute(update_query, {'listing_id': listing_id})
+
+            if result.rowcount > 0:
+                # If the item was successfully marked as sold, insert the transaction
+                transaction_query = text("""
+                    INSERT INTO Transactions (transactiondate, buyer, listingid, amount, seller)
+                    VALUES (:transactiondate, :buyer, :listingid, :amount, :seller)
+                """)
+                conn.execute(transaction_query, {
+                    'transactiondate': date.today(),
+                    'buyer': user_uni,
+                    'listingid': listing_id,
+                    'amount': item.price,
+                    'seller': item.createdby
+                })
+                conn.commit()  # Commit the transaction to ensure changes are saved
+
+                flash("Purchase completed successfully!")
+                return render_template("purchase_success.html", item=item)
+
+            else:
+                flash("An error occurred while processing your purchase.")
+                return redirect(url_for('view_item', listing_id=listing_id))
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        flash("An error occurred while processing your request.")
         return redirect(url_for('view_item', listing_id=listing_id))
-
-    # Update the status to 'sold'
-    update_query = text("""
-        UPDATE Listings
-        SET status = 'sold'
-        WHERE listingid = :listing_id AND status = 'available'
-    """)
-
-    with g.conn as conn:
-        result = conn.execute(update_query, {'listing_id': listing_id})
-        if result.rowcount > 0:
-            g.conn.commit()
-            flash("Purchase completed successfully!")
-            return redirect(url_for('show_popular_listings'))
-        else:
-            flash("An error occurred while processing your purchase.")
-            return redirect(url_for('view_item', listing_id=listing_id))
 
 # Delete user
 @app.route('/delete_account', methods=['POST'])
@@ -522,7 +548,7 @@ def view_conversation(recipient_uni):
 
     return render_template("view_conversation.html", messages=messages, recipient_uni=recipient_uni)
 
-#search
+# Search function
 @app.route('/search', methods=['GET'])
 def search():
     keyword = request.args.get('query', '').strip()
@@ -531,13 +557,14 @@ def search():
         flash("Please enter a keyword to search.")
         return redirect(url_for('show_popular_listings'))
 
-    # SQL query to search for the keyword in relevant columns, including createdby
+    # SQL query to search for the keyword in title, description, and user name
     query = text("""
-        SELECT listingid, title, description, link, createdby
-        FROM Listings
-        WHERE title ILIKE :kw 
-           OR description ILIKE :kw
-           OR createdby ILIKE :kw
+        SELECT L.listingid, L.title, L.description, L.link, U.name AS createdby
+        FROM Listings L
+        JOIN Users U ON L.createdby = U.uni
+        WHERE L.title ILIKE :kw 
+           OR L.description ILIKE :kw
+           OR U.name ILIKE :kw
     """)
     search_keyword = f"%{keyword}%"
     
@@ -546,6 +573,7 @@ def search():
 
     return render_template("search_results.html", keyword=keyword, results=results)
 
+# Advanced search function
 @app.route('/advanced_search', methods=['GET'])
 def advanced_search():
     if request.args:
@@ -556,40 +584,41 @@ def advanced_search():
         condition = request.args.get('condition', '').strip()
         status = request.args.get('status', '').strip()
         date_added = request.args.get('date_added')
-        createdby = request.args.get('createdby', '').strip()  # New field for creator's UNI
+        createdby = request.args.get('createdby', '').strip()  # New field for creator's name
 
-        # SQL query with dynamic filtering, including createdby
+        # SQL query with dynamic filtering, including user name
         query = """
-            SELECT listingid, title, description, price, condition, status, location, link, dateadded, createdby
-            FROM Listings
+            SELECT L.listingid, L.title, L.description, L.price, L.condition, L.status, L.location, L.link, L.dateadded, U.name AS createdby
+            FROM Listings L
+            JOIN Users U ON L.createdby = U.uni
             WHERE TRUE
         """
         filters = {}
 
         # Add filters based on user input
         if keyword:
-            query += " AND (title ILIKE :keyword OR description ILIKE :keyword)"
+            query += " AND (L.title ILIKE :keyword OR L.description ILIKE :keyword)"
             filters['keyword'] = f"%{keyword}%"
         if location:
-            query += " AND location ILIKE :location"
+            query += " AND L.location ILIKE :location"
             filters['location'] = f"%{location}%"
         if min_price:
-            query += " AND price >= :min_price"
+            query += " AND L.price >= :min_price"
             filters['min_price'] = min_price
         if max_price:
-            query += " AND price <= :max_price"
+            query += " AND L.price <= :max_price"
             filters['max_price'] = max_price
         if condition:
-            query += " AND condition = :condition"
+            query += " AND L.condition = :condition"
             filters['condition'] = condition
         if status:
-            query += " AND status = :status"
+            query += " AND L.status = :status"
             filters['status'] = status
         if date_added:
-            query += " AND dateadded >= :date_added"
+            query += " AND L.dateadded >= :date_added"
             filters['date_added'] = date_added
         if createdby:
-            query += " AND createdby ILIKE :createdby"
+            query += " AND U.name ILIKE :createdby"
             filters['createdby'] = f"%{createdby}%"
 
         with g.conn as conn:
@@ -598,6 +627,14 @@ def advanced_search():
         return render_template("search_results.html", keyword=keyword, results=results)
 
     return render_template("advanced_search.html")
+
+# Highlight filter function
+@app.template_filter('highlight')
+def highlight(text, keyword):
+    """Highlight occurrences of keyword in the text with a span tag."""
+    escaped_keyword = re.escape(keyword)  # Escape special characters in keyword
+    highlighted_text = re.sub(f"({escaped_keyword})", r'<span class="highlight">\1</span>', text, flags=re.IGNORECASE)
+    return Markup(highlighted_text)
 
 # Run the app
 if __name__ == "__main__":

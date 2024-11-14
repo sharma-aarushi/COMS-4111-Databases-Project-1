@@ -14,16 +14,14 @@
                         style="height: 200px; object-fit: cover;">
                 </a>
                 <div class="card-body">
-                    <!-- Highlight keyword in title and mark it as safe -->
+                    <!-- Apply the highlight filter directly -->
                     <h5 class="card-title">
                         <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">
-                            {{ item.title | highlight(keyword) | replace('|||', '<span class="highlight">') |
-                                replace('|||', '</span>') }}
+                            {{ item.title | highlight(keyword) }}
                         </a>
                     </h5>
                     <p class="card-text">
-                        {{ item.description | highlight(keyword, 100) | replace('|||', '<span class="highlight">') |
-                            replace('|||', '</span>') }}
+                        {{ item.description | highlight(keyword) }}
                     </p>
                 </div>
             </div>
