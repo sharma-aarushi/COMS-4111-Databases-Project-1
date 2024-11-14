@@ -315,3 +315,15 @@ th {
 .wishlist-remove-form {
     margin-left: 15px;
 }
+
+/* Ensure that item images have a fixed height and maintain aspect ratio */
+.item-image {
+    width: auto;
+    /* Makes the image fill the width of its container */
+    height: auto;
+    /* Maintains the aspect ratio */
+    object-fit: cover;
+    /* Ensures the image covers the container without distortion */
+    max-height: 200px;
+    /* Optional: sets a max height to limit image height */
+}

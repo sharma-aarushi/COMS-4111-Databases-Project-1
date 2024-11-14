@@ -22,20 +22,23 @@
     <!-- Popular Items Section -->
     <h2 class="text-center mb-4 welcome_Card">Popular Items</h2>
     <div class="row row-cols-1 row-cols-md-3 g-4">
-        {% for item in popular_items %}
-        <div class="col">
-            <a href="{{ url_for('view_item', listing_id=item['listingid']) }}" class="card-link">
-                <div class="card h-100">
-                    <img src="{{ item['link'] }}" class="card-img-top" alt="{{ item['listing_title'] }}"
-                        style="height: 200px; object-fit: cover;">
+        <div class="row">
+            {% for item in popular_items %}
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">
+                        <img src="{{ item.link }}" class="card-img-top item-image" alt="{{ item.title }}">
+                    </a>
                     <div class="card-body">
-                        <h5 class="card-title">{{ item['listing_title'] }}</h5>
-                        <p class="card-text">{{ item['times_added_to_wishlist'] }} wishlists</p>
+                        <h5 class="card-title">
+                            <a href="{{ url_for('view_item', listing_id=item.listingid) }}" class="card-link">{{
+                                item.title }}</a>
+                        </h5>
+                        <p class="card-text">{{ item.times_added_to_wishlist }} wishlists</p>
                     </div>
                 </div>
-            </a>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
     </div>
-</div>
-{% endblock %}
+    {% endblock %}

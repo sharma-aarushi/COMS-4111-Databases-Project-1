@@ -206,7 +206,7 @@ def add_to_wishlist(listing_id):
             flash("Item added to wishlist successfully.")
     
     return redirect(url_for('view_item', listing_id=listing_id))
-    
+
 @app.route('/remove_from_wishlist/<int:listing_id>', methods=['POST'])
 def remove_from_wishlist(listing_id):
     user_uni = get_current_user()
@@ -556,7 +556,6 @@ def view_conversation(recipient_uni):
     return render_template("view_conversation.html", messages=messages, recipient_uni=recipient_uni)
 
 # Search function
-# Search function
 @app.route('/search', methods=['GET'])
 def search():
     keyword = request.args.get('query', '').strip()
@@ -652,7 +651,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8121, type=int)
+    @click.argument('PORT', default=8119, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
