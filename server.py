@@ -57,6 +57,13 @@ def login():
             # UNI exists, set global current_user
             current_user = uni
             flash("Login successful.")
+            next_page = request.args.get('next')
+            flash_message = request.args.get('flash')
+            
+            if next_page:
+                if flash_message:
+                    flash(flash_message)
+                return redirect(next_page)
             return redirect(url_for('profile'))
         else:
             flash("User does not exist. Please try again.")
@@ -79,6 +86,8 @@ def is_logged_in():
 
 # Utility function to check if user is logged in
 def get_current_user():
+    # Ensure this function returns the UNI from session or global variable
+    global current_user
     return current_user
 
 @app.context_processor
@@ -143,21 +152,129 @@ def view_item(listing_id):
     listing = result._mapping
     return render_template("view-item.html", item=listing)
 
+# Wishlist route
+# Wishlist route
+@app.route('/wishlist')
+def wishlist():
+    user_uni = get_current_user()  # Ensure this function returns the logged-in user's UNI.
+    if not user_uni:
+        flash("Please log in to view your wishlist.")
+        return redirect(url_for('login'))
+
+    # Query to get wishlist items for the user where the item is available (not sold)
+    query = text("""
+        SELECT L.listingid, L.title, L.description, L.price, L.condition, L.status, L.link, L.dateadded
+        FROM Listings L
+        JOIN In_Wishlist IW ON L.listingid = IW.listing_id
+        WHERE IW.uni = :user_uni AND L.status != 'sold'
+    """)
+
+    with g.conn as conn:
+        wishlist_items = conn.execute(query, {'user_uni': user_uni}).fetchall()
+
+    # Pass fetched items to the template
+    return render_template("wishlist.html", wishlist_items=wishlist_items)
+
 # Add to wishlist
 @app.route('/add_to_wishlist/<int:listing_id>', methods=['POST'])
 def add_to_wishlist(listing_id):
     user_uni = get_current_user()
     if not user_uni:
         flash("Please log in to add items to your wishlist.")
+        return redirect(url_for('login', next=url_for('view_item', listing_id=listing_id), flash="Item added to wishlist successfully"))
+
+    # Check if item is already in wishlist
+    check_query = text("SELECT 1 FROM In_Wishlist WHERE uni = :user_uni AND listing_id = :listing_id")
+    insert_query = text("INSERT INTO In_Wishlist (uni, listing_id) VALUES (:user_uni, :listing_id)")
+
+    with g.conn as conn:
+        existing_entry = conn.execute(check_query, {'user_uni': user_uni, 'listing_id': listing_id}).fetchone()
+        
+        if existing_entry:
+            flash("Item is already in your wishlist.")
+        else:
+            conn.execute(insert_query, {'user_uni': user_uni, 'listing_id': listing_id})
+            g.conn.commit()  # Explicit commit to save the change
+            flash("Item added to wishlist successfully.")
+    
+    return redirect(url_for('view_item', listing_id=listing_id))
+
+@app.route('/remove_from_wishlist/<int:listing_id>', methods=['POST'])
+def remove_from_wishlist(listing_id):
+    user_uni = get_current_user()
+    if not user_uni:
+        flash("Please log in to manage your wishlist.")
         return redirect(url_for('login'))
 
-    query = text("INSERT INTO In_Wishlist (uni, listing_id) VALUES (:user_uni, :listing_id)")
+    # Remove the item from the wishlist for the logged-in user
+    delete_query = text("DELETE FROM In_Wishlist WHERE uni = :user_uni AND listing_id = :listing_id")
     with g.conn as conn:
-        conn.execute(query, {'user_uni': user_uni, 'listing_id': listing_id})
-        g.conn.commit()
+        conn.execute(delete_query, {'user_uni': user_uni, 'listing_id': listing_id})
+        g.conn.commit()  # Commit the changes
+
+    flash("Item removed from wishlist.")
+    return redirect(url_for('wishlist'))
     
-    flash("Item added to wishlist.")
-    return redirect(url_for('view_item', listing_id=listing_id))
+# Buy item
+@app.route('/buy_item/<int:listing_id>', methods=['POST'])
+def buy_item(listing_id):
+    user_uni = get_current_user()
+    if not user_uni:
+        flash("Please log in to purchase an item.")
+        return redirect(url_for('login'))
+
+    # Check the status before proceeding
+    query = text("SELECT status FROM Listings WHERE listingid = :listing_id")
+    with g.conn as conn:
+        status = conn.execute(query, {'listing_id': listing_id}).scalar()
+
+    if status == 'sold':
+        flash("Sorry, this item is already sold.")
+        return redirect(url_for('view_item', listing_id=listing_id))
+
+    # Update the status to 'sold'
+    update_query = text("""
+        UPDATE Listings
+        SET status = 'sold'
+        WHERE listingid = :listing_id AND status = 'available'
+    """)
+
+    with g.conn as conn:
+        result = conn.execute(update_query, {'listing_id': listing_id})
+        if result.rowcount > 0:
+            g.conn.commit()
+            flash("Purchase completed successfully!")
+            return redirect(url_for('show_popular_listings'))
+        else:
+            flash("An error occurred while processing your purchase.")
+            return redirect(url_for('view_item', listing_id=listing_id))
+
+# Delete user
+@app.route('/delete_account', methods=['POST'])
+def delete_account():
+    user_uni = get_current_user()
+    if not user_uni:
+        flash("You need to be logged in to delete your account.")
+        return redirect(url_for('login'))
+
+    delete_wishlist_query = text("DELETE FROM In_Wishlist WHERE uni = :user_uni")
+    delete_listings_query = text("DELETE FROM Listings WHERE createdby = :user_uni")
+    update_messages_query = text("UPDATE Messages SET sender = 'deleted user', receiver = 'deleted user' WHERE sender = :user_uni OR receiver = :user_uni")
+    delete_user_query = text("DELETE FROM Users WHERE uni = :user_uni")
+
+    with g.conn as conn:
+        conn.execute(delete_wishlist_query, {'user_uni': user_uni})
+        conn.execute(delete_listings_query, {'user_uni': user_uni})
+        conn.execute(update_messages_query, {'user_uni': user_uni})
+        conn.execute(delete_user_query, {'user_uni': user_uni})
+        g.conn.commit()
+
+    global current_user
+    current_user = None
+    flash("Your account and associated data have been deleted.")
+    return redirect(url_for('show_popular_listings'))
+
+#user's listing
 
 @app.route('/new_listing', methods=['GET', 'POST'])
 def new_listing():
@@ -176,24 +293,26 @@ def new_listing():
         status = request.form.get('status')
         link = request.form.get('link')
         createdby = user_uni  # Assign the logged-in user's UNI
-
         dateadded = date.today()
 
+        # Ensure all fields are filled
         if not all([title, location, category, description, price, condition, status, link]):
             flash("All fields, including the link, are required.")
             return redirect(url_for('new_listing'))
         
+        # Convert price to float and handle errors
         try:
             price = float(price)
         except ValueError:
             flash("Invalid price value.")
             return redirect(url_for('new_listing'))
 
+        # Insert the new listing into the database
         query = text("""
             INSERT INTO Listings (title, location, category, createdby, description, price, condition, status, link, dateadded)
             VALUES (:title, :location, :category, :createdby, :description, :price, :condition, :status, :link, :dateadded)
         """)
-
+        
         try:
             with g.conn as conn:
                 conn.execute(query, {
@@ -219,7 +338,6 @@ def new_listing():
 
     return render_template("create_listing.html")
 
-# Edit Listing
 @app.route('/edit_listing/<int:listing_id>', methods=['GET', 'POST'])
 def edit_listing(listing_id):
     user_uni = get_current_user()
@@ -237,12 +355,14 @@ def edit_listing(listing_id):
         status = request.form.get('status')
         link = request.form.get('link')
 
+        # Convert price to float and handle errors
         try:
             price = float(price)
         except ValueError:
             flash("Invalid price value.")
             return redirect(url_for('edit_listing', listing_id=listing_id))
 
+        # Update the listing in the database
         query = text("""
             UPDATE Listings
             SET title = :title, location = :location, category = :category, description = :description,
@@ -273,6 +393,7 @@ def edit_listing(listing_id):
 
         return redirect(url_for('profile'))
     
+    # Query to fetch the current details of the listing
     query = text("""
         SELECT listingid, title, location, category, description, price, condition, status, link
         FROM Listings
@@ -289,7 +410,6 @@ def edit_listing(listing_id):
         flash("Listing not found or unauthorized.")
         return redirect(url_for('profile'))
 
-# Delete Listing
 @app.route('/delete_listing/<int:listing_id>', methods=['POST'])
 def delete_listing(listing_id):
     user_uni = get_current_user()
@@ -297,6 +417,7 @@ def delete_listing(listing_id):
         flash("Please log in to delete the listing.")
         return redirect(url_for('login'))
 
+    # Delete the listing from the database
     query = text("""
         DELETE FROM Listings 
         WHERE listingid = :listing_id AND createdby = :user_uni
@@ -312,7 +433,8 @@ def delete_listing(listing_id):
         flash("An error occurred while trying to delete the listing.")
     
     return redirect(url_for('profile'))
-
+    
+# Message seller
 @app.route('/message_seller/<int:listing_id>', methods=['POST'])
 def message_seller(listing_id):
     user_uni = get_current_user()
@@ -332,6 +454,12 @@ def message_seller(listing_id):
 
         recipient_uni = result._mapping['createdby']
 
+        # Check if the recipient is marked as 'deleted user'
+        if recipient_uni == 'deleted user':
+            flash("You cannot send a message to a deleted user.")
+            return redirect(url_for('view_item', listing_id=listing_id))
+
+        # Insert the message into the Messages table
         insert_query = text("""
             INSERT INTO Messages (content, timestamp, sender, receiver)
             VALUES (:content, :timestamp, :sender, :receiver)
@@ -348,14 +476,14 @@ def message_seller(listing_id):
     flash("Message sent to the seller.")
     return redirect(url_for('view_item', listing_id=listing_id))
 
-# Message Overview
-@app.route('/messages_overview')
+@app.route('/message_overview')
 def message_overview():
     user_uni = get_current_user()
     if not user_uni:
         flash("Please log in to view your messages.")
         return redirect(url_for('login'))
 
+    # Get unique conversations for the current user based on sender and receiver
     query = text("""
         SELECT DISTINCT CASE 
             WHEN sender = :user_uni THEN receiver 
@@ -370,7 +498,6 @@ def message_overview():
 
     return render_template("message_overview.html", conversations=conversations)
 
-# View specific conversation
 @app.route('/messages/<string:recipient_uni>')
 def view_conversation(recipient_uni):
     user_uni = get_current_user()
@@ -378,6 +505,7 @@ def view_conversation(recipient_uni):
         flash("Please log in to view messages.")
         return redirect(url_for('login'))
 
+    # Query to fetch the conversation between current_user and recipient_uni
     query = text("""
         SELECT content, timestamp, sender, receiver
         FROM Messages
@@ -394,6 +522,7 @@ def view_conversation(recipient_uni):
 
     return render_template("view_conversation.html", messages=messages, recipient_uni=recipient_uni)
 
+#search
 @app.route('/search', methods=['GET'])
 def search():
     keyword = request.args.get('query', '').strip()
@@ -402,11 +531,13 @@ def search():
         flash("Please enter a keyword to search.")
         return redirect(url_for('show_popular_listings'))
 
+    # SQL query to search for the keyword in relevant columns, including createdby
     query = text("""
-        SELECT listingid, title, description, link
+        SELECT listingid, title, description, link, createdby
         FROM Listings
         WHERE title ILIKE :kw 
            OR description ILIKE :kw
+           OR createdby ILIKE :kw
     """)
     search_keyword = f"%{keyword}%"
     
@@ -425,14 +556,17 @@ def advanced_search():
         condition = request.args.get('condition', '').strip()
         status = request.args.get('status', '').strip()
         date_added = request.args.get('date_added')
+        createdby = request.args.get('createdby', '').strip()  # New field for creator's UNI
 
+        # SQL query with dynamic filtering, including createdby
         query = """
-            SELECT listingid, title, description, price, condition, status, location, link, dateadded
+            SELECT listingid, title, description, price, condition, status, location, link, dateadded, createdby
             FROM Listings
             WHERE TRUE
         """
         filters = {}
 
+        # Add filters based on user input
         if keyword:
             query += " AND (title ILIKE :keyword OR description ILIKE :keyword)"
             filters['keyword'] = f"%{keyword}%"
@@ -454,6 +588,9 @@ def advanced_search():
         if date_added:
             query += " AND dateadded >= :date_added"
             filters['date_added'] = date_added
+        if createdby:
+            query += " AND createdby ILIKE :createdby"
+            filters['createdby'] = f"%{createdby}%"
 
         with g.conn as conn:
             results = conn.execute(text(query), filters).fetchall()
@@ -462,21 +599,7 @@ def advanced_search():
 
     return render_template("advanced_search.html")
 
-import re
-from markupsafe import Markup
-
-# Highlight filter to be used in Jinja templates
-@app.template_filter('highlight')
-def highlight(text, keyword, limit=None):
-    if limit and len(text) > limit:
-        text = text[:limit] + "..."
-
-    if keyword:
-        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
-        highlighted_text = pattern.sub(r"<span class='highlight'>\g<0></span>", text)
-        return Markup(highlighted_text)
-    return text
-
+# Run the app
 if __name__ == "__main__":
     import click
 
@@ -484,7 +607,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8118, type=int)
+    @click.argument('PORT', default=8120, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))

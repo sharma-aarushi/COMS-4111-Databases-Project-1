@@ -271,3 +271,47 @@ th {
     margin: 5px 0;
     max-width: 60%;
 }
+
+.wishlist-container {
+    margin: 20px;
+}
+
+.wishlist-items {
+    list-style: none;
+    padding: 0;
+}
+
+.wishlist-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.wishlist-item-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    margin-right: 15px;
+}
+
+.wishlist-item-details {
+    flex-grow: 1;
+}
+
+.wishlist-item-title {
+    font-weight: bold;
+    font-size: 1.2em;
+    color: #333;
+    text-decoration: none;
+}
+
+.wishlist-item-title:hover {
+    text-decoration: underline;
+}
+
+.wishlist-remove-form {
+    margin-left: 15px;
+}

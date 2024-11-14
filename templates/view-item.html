@@ -2,6 +2,7 @@
 
 {% block content %}
 <div class="container mt-3">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
     <!-- Flash Messages Section -->
     {% with messages = get_flashed_messages() %}
@@ -14,24 +15,19 @@
     {% endif %}
     {% endwith %}
 
+    <div id="flash-messages"></div>
+
     <div class="row">
         <!-- Item Details - Left Side -->
         <div class="col-md-8">
-            <!-- Item Title -->
             <h2 class="welcome_Card">{{ item.title }}</h2>
-
-            <!-- Item Image -->
             <div class="item-images mb-3">
                 <img src="{{ item.link }}" alt="{{ item.title }}" class="img-fluid"
                     style="max-width: 100%; max-height: 400px; object-fit: contain;">
             </div>
-
-            <!-- Item Description and Details -->
             <div class="card-text">
                 <p>{{ item.description }}</p>
             </div>
-
-            <!-- Item Attributes -->
             <div class="card-text" style="color:#585858">
                 <p><strong>Condition:</strong> {{ item.condition }}</p>
                 <p><strong>Status:</strong> {{ item.status }}</p>
@@ -60,18 +56,23 @@
             </form>
 
             <!-- Add to Wishlist Button -->
+            {% if current_user %}
             <form id="addToWishlistForm" action="{{ url_for('add_to_wishlist', listing_id=item.listingid) }}"
                 method="post">
-                <button type="submit" class="btn btn-outline-primary mb-3">Add to Wishlist</button>
+                <button type="submit" class="btn btn-outline-dark mb-3">
+                    <i class="fas fa-heart"></i> Add to Wishlist
+                </button>
             </form>
-
+            {% else %}
+            <a href="{{ url_for('login', next=url_for('view_item', listing_id=item.listingid), flash='Item added to wishlist successfully') }}"
+                class="btn btn-outline-dark mb-3">
+                <i class="fas fa-heart"></i> Add to Wishlist
+            </a>
+            {% endif %}
 
             <!-- Buy Item Button - Displayed Only if Item is Available -->
             {% if item.status == 'available' %}
             <form id="buyItemForm" action="{{ url_for('buy_item', listing_id=item.listingid) }}" method="post">
-                <button type="submit">Buy Item</button>
-                <input type="hidden" name="buyer_uni" value="guest_user">
-                <input type="hidden" name="amount" value="{{ item.price }}">
                 <button type="submit" class="btn btn-primary">Buy Now</button>
             </form>
             {% else %}

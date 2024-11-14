@@ -1,30 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wishlist</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <h1>Your Wishlist</h1>
-    <div class="wishlist-container">
-        {% if wishlist_items %}
-            <ul>
-                {% for item in wishlist_items %}
-                    <li>
-                        <a href="{{ url_for('view_item', listing_id=item.listingid) }}">{{ item.title }}</a>
-                        <p>{{ item.description }}</p>
-                        <!-- Remove from Wishlist Button -->
-                        <form action="{{ url_for('remove_from_wishlist', listing_id=item.listingid) }}" method="post">
-                            <button type="submit" class="btn btn-danger">Remove from Wishlist</button>
-                        </form>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>Your wishlist is currently empty.</p>
-        {% endif %}
+{% extends "index.html" %}
+
+{% block content %}
+<div class="container mt-3">
+    <h2>Your Wishlist</h2>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="alert alert-success" role="alert">
+        {% for message in messages %}
+        {{ message }}
+        {% endfor %}
     </div>
-</body>
-</html>
+    {% endif %}
+    {% endwith %}
+
+    {% if wishlist_items %}
+    <div class="row">
+        {% for item in wishlist_items %}
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <img src="{{ item.link }}" class="card-img-top" alt="{{ item.title }}">
+                <div class="card-body">
+                    <h5 class="card-title">{{ item.title }}</h5>
+                    <p class="card-text">{{ item.description }}</p>
+                    <p><strong>Price:</strong> ${{ item.price }}</p>
+                    <p><strong>Condition:</strong> {{ item.condition }}</p>
+
+                    <!-- Remove from Wishlist Button -->
+                    <form action="{{ url_for('remove_from_wishlist', listing_id=item.listingid) }}" method="post">
+                        <button type="submit" class="btn btn-danger">Remove from Wishlist</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p>You have no items in your wishlist.</p>
+    {% endif %}
+</div>
+{% endblock %}

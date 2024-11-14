@@ -14,12 +14,15 @@
     <a class="navbar-brand" href="{{ url_for('show_popular_listings') }}">LionTrade</a>
     <ul>
       <li><a href="{{ url_for('show_popular_listings') }}">Home</a></li>
+      
       {% if current_user %}
       <!-- Only show these links if user is logged in -->
       <li><a href="{{ url_for('new_listing') }}">Create a Listing</a></li>
       <li><a href="{{ url_for('profile') }}">Profile</a></li>
       <li><a href="{{ url_for('message_overview') }}">Messages</a></li>
+      <li><a href="{{ url_for('wishlist') }}">❤️ Wishlist</a></li> <!-- Wishlist icon with a heart -->
       <li><a href="{{ url_for('logout') }}">Logout</a></li>
+      
       {% else %}
       <!-- If not logged in, show only login link -->
       <li><a href="{{ url_for('login') }}">Login</a></li>
