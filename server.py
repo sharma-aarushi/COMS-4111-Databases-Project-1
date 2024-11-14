@@ -96,12 +96,14 @@ def inject_user():
     return {'current_user': current_user}
 
 # Home page with popular listings
+# Home page with popular listings
 @app.route('/')
 def show_popular_listings():
     query = text("""
         SELECT L.listingid, L.title AS listing_title, COUNT(IW.listing_id) AS times_added_to_wishlist, L.link
         FROM Listings L
         JOIN In_Wishlist IW ON L.listingid = IW.listing_id
+        WHERE L.status != 'sold'
         GROUP BY L.listingid, L.title, L.link
         ORDER BY times_added_to_wishlist DESC
         LIMIT 5;
@@ -549,6 +551,7 @@ def view_conversation(recipient_uni):
     return render_template("view_conversation.html", messages=messages, recipient_uni=recipient_uni)
 
 # Search function
+# Search function
 @app.route('/search', methods=['GET'])
 def search():
     keyword = request.args.get('query', '').strip()
@@ -557,14 +560,13 @@ def search():
         flash("Please enter a keyword to search.")
         return redirect(url_for('show_popular_listings'))
 
-    # SQL query to search for the keyword in title, description, and user name
+    # SQL query to search for the keyword in title, description, and user name, excluding sold listings
     query = text("""
         SELECT L.listingid, L.title, L.description, L.link, U.name AS createdby
         FROM Listings L
         JOIN Users U ON L.createdby = U.uni
-        WHERE L.title ILIKE :kw 
-           OR L.description ILIKE :kw
-           OR U.name ILIKE :kw
+        WHERE (L.title ILIKE :kw OR L.description ILIKE :kw OR U.name ILIKE :kw)
+          AND L.status != 'sold'
     """)
     search_keyword = f"%{keyword}%"
     
@@ -573,6 +575,7 @@ def search():
 
     return render_template("search_results.html", keyword=keyword, results=results)
 
+# Advanced search function
 # Advanced search function
 @app.route('/advanced_search', methods=['GET'])
 def advanced_search():
@@ -586,12 +589,12 @@ def advanced_search():
         date_added = request.args.get('date_added')
         createdby = request.args.get('createdby', '').strip()  # New field for creator's name
 
-        # SQL query with dynamic filtering, including user name
+        # SQL query with dynamic filtering, including user name, and excluding sold listings
         query = """
             SELECT L.listingid, L.title, L.description, L.price, L.condition, L.status, L.location, L.link, L.dateadded, U.name AS createdby
             FROM Listings L
             JOIN Users U ON L.createdby = U.uni
-            WHERE TRUE
+            WHERE L.status != 'sold'
         """
         filters = {}
 
