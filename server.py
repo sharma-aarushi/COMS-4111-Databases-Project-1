@@ -188,7 +188,7 @@ def add_to_wishlist(listing_id):
 
     # Check if item is already in wishlist
     check_query = text("SELECT 1 FROM In_Wishlist WHERE uni = :user_uni AND listing_id = :listing_id")
-    insert_query = text("INSERT INTO In_Wishlist (uni, listing_id) VALUES (:user_uni, :listing_id)")
+    insert_query = text("INSERT INTO In_Wishlist (uni, listing_id, dateadded) VALUES (:user_uni, :listing_id, :dateadded)")
 
     with g.conn as conn:
         existing_entry = conn.execute(check_query, {'user_uni': user_uni, 'listing_id': listing_id}).fetchone()
@@ -196,12 +196,17 @@ def add_to_wishlist(listing_id):
         if existing_entry:
             flash("Item is already in your wishlist.")
         else:
-            conn.execute(insert_query, {'user_uni': user_uni, 'listing_id': listing_id})
+            # Insert with the current date for dateadded
+            conn.execute(insert_query, {
+                'user_uni': user_uni,
+                'listing_id': listing_id,
+                'dateadded': date.today()  # Automatically sets today's date
+            })
             g.conn.commit()  # Explicit commit to save the change
             flash("Item added to wishlist successfully.")
     
     return redirect(url_for('view_item', listing_id=listing_id))
-
+    
 @app.route('/remove_from_wishlist/<int:listing_id>', methods=['POST'])
 def remove_from_wishlist(listing_id):
     user_uni = get_current_user()
