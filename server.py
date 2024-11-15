@@ -467,7 +467,7 @@ def delete_listing(listing_id):
     return redirect(url_for('profile'))
     
 # Message seller
-@app.route('/message_seller/<int:listing_id>', methods=['POST'])
+@app.route('/message_seller/<int:listing_id>')
 def message_seller(listing_id):
     if not is_logged_in():
         flash("Please log in to send a message.")
@@ -510,48 +510,56 @@ def message_overview():
         flash("Please log in to view your messages.")
         return redirect(url_for('login'))
 
-    # Get unique conversations for the current user based on sender and receiver
+    # Get unique conversations for the current user based on sender, receiver, and listing_id
     query = text("""
-        SELECT DISTINCT CASE 
-            WHEN sender = :user_uni THEN receiver 
-            ELSE sender 
-        END AS other_user
+        SELECT DISTINCT listing_id, 
+               CASE 
+                   WHEN sender = :user_uni THEN receiver 
+                   ELSE sender 
+               END AS other_user
         FROM Messages
         WHERE sender = :user_uni OR receiver = :user_uni
+        ORDER BY listing_id, other_user;
     """)
 
     with g.conn as conn:
         conversations = conn.execute(query, {'user_uni': user_uni}).fetchall()
 
-    return render_template("message_overview.html", conversations=conversations)    
+    # Convert result to a list of dictionaries to pass to the template
+    conversations = [dict(row._mapping) for row in conversations]
 
-@app.route('/view_conversation/<string:recipient_uni>')
-def view_conversation(recipient_uni):
+    return render_template("message_overview.html", conversations=conversations)
+
+@app.route('/view_conversation/<string:recipient_uni>/<int:listing_id>')
+def view_conversation(recipient_uni, listing_id):
     # Get the current user
     user_uni = get_current_user()
     if not user_uni:
         flash("Please log in to view conversations.")
         return redirect(url_for('login'))
 
-    # Fetch messages between the current user and the recipient
+    # Fetch messages between the current user and the recipient for the specific listing
     query = text("""
         SELECT content, timestamp, sender, receiver
         FROM Messages
-        WHERE (sender = :current_user AND receiver = :recipient_uni) 
-           OR (sender = :recipient_uni AND receiver = :current_user)
+        WHERE listing_id = :listing_id AND 
+              ((sender = :current_user AND receiver = :recipient_uni) 
+           OR (sender = :recipient_uni AND receiver = :current_user))
         ORDER BY timestamp ASC
     """)
     
     with g.conn as conn:
         result = conn.execute(query, {
             'current_user': user_uni,
-            'recipient_uni': recipient_uni
+            'recipient_uni': recipient_uni,
+            'listing_id': listing_id
         })
 
-        # Use row._mapping to create a list of dictionaries
+        # Convert results to a list of dictionaries
         messages = [row._mapping for row in result]
 
-    return render_template("messages.html", messages=messages, recipient_uni=recipient_uni)
+    # Pass user_uni to the template
+    return render_template("messages.html", messages=messages, recipient_uni=recipient_uni, listing_id=listing_id, user_uni=user_uni)
 
 @app.route('/send_message/<int:listing_id>', methods=['POST'])
 def send_message(listing_id):
@@ -561,17 +569,17 @@ def send_message(listing_id):
         return redirect(url_for('login'))
 
     sender = get_current_user()  # Get the logged-in user's UNI
-    recipient = request.form.get('receiver_uni')  # UNI of the other party
+    recipient = request.form.get('receiver_uni')  # UNI of the other party (either buyer or seller)
     message_content = request.form.get('message')
 
     if not message_content:
         flash("Message cannot be empty.")
         return redirect(url_for('view_item', listing_id=listing_id))
 
-    # Insert the message into the Messages table
+    # Insert the message with listing_id into the Messages table
     insert_query = text("""
-        INSERT INTO Messages (content, timestamp, sender, receiver)
-        VALUES (:content, :timestamp, :sender, :receiver)
+        INSERT INTO Messages (content, timestamp, sender, receiver, listing_id)
+        VALUES (:content, :timestamp, :sender, :receiver, :listing_id)
     """)
 
     try:
@@ -580,7 +588,8 @@ def send_message(listing_id):
                 'content': message_content,
                 'timestamp': datetime.now(),
                 'sender': sender,
-                'receiver': recipient
+                'receiver': recipient,
+                'listing_id': listing_id
             })
             conn.commit()
             flash("Message sent successfully.")
@@ -589,11 +598,12 @@ def send_message(listing_id):
         flash("Failed to send the message.")
 
     # Redirect back to the conversation view
-    return redirect(url_for('view_conversation', recipient_uni=recipient))
+    return redirect(url_for('view_conversation', recipient_uni=recipient, listing_id=listing_id))
 
-@app.route('/messages', defaults={'listing_id': None})
-@app.route('/messages/<int:listing_id>')
+@app.route('/messages',  methods=['GET','POST'])
+@app.route('/messages/<int:listing_id>', methods=['GET','POST'])
 def messages(listing_id=None):
+    print("MESSAGES")
     # Check if the user is logged in
     if not current_user:
         flash("Please log in to view messages.")
@@ -601,7 +611,9 @@ def messages(listing_id=None):
 
     # If listing_id is provided, fetch the `recipient_uni` (seller) based on `createdby` attribute
     recipient_uni = None
+    print(listing_id)
     if listing_id:
+        print("listing id")
         query = text("SELECT createdby FROM Listings WHERE listingid = :listing_id")
         with g.conn as conn:
             result = conn.execute(query, {'listing_id': listing_id}).fetchone()
@@ -614,13 +626,21 @@ def messages(listing_id=None):
         return redirect(url_for('message_overview'))
 
     # Now that we have recipient_uni, fetch all messages between current_user and recipient_uni
+    # query = text("""
+    #     SELECT content, timestamp, sender, receiver
+    #     FROM Messages
+    #     WHERE (sender = :current_user AND receiver = :recipient_uni) 
+    #        OR (sender = :recipient_uni AND receiver = :current_user)
+    #     ORDER BY timestamp ASC
+    # """)
+
     query = text("""
-        SELECT content, timestamp, sender, receiver
-        FROM Messages
-        WHERE (sender = :current_user AND receiver = :recipient_uni) 
-           OR (sender = :recipient_uni AND receiver = :current_user)
-        ORDER BY timestamp ASC
+        INSERT INTO Messages (content, timestamp, sender, receiver)
+        VALUES (:content, :timestamp, :sender, :receiver)
     """)
+
+    print(query)
+
     with g.conn as conn:
         messages = conn.execute(query, {
             'current_user': current_user,
@@ -724,9 +744,10 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8124, type=int)
+    @click.argument('PORT', default=8131, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
-        app.run(host=HOST, port=PORT, debug=debug, threaded=threaded)
+        app.run(host=HOST, port=PORT)
+        #app.run(host=HOST, port=PORT, debug=debug, threaded=threaded)
     run()

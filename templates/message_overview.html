@@ -2,13 +2,25 @@
 
 {% block content %}
 <h2>Your Conversations</h2>
-<ul class="conversations">
+<div class="conversations">
+    {% set current_listing_id = None %}
     {% for conversation in conversations %}
-    <li>
-        <a href="{{ url_for('view_conversation', recipient_uni=conversation.other_user) }}">
-            View conversation with {{ conversation.other_user }}
-        </a>
-    </li>
-    {% endfor %}
-</ul>
+    {% if current_listing_id != conversation.listing_id %}
+    {% if current_listing_id is not none %}
+    </ul> <!-- Close previous listing's conversations list -->
+    {% endif %}
+    <!-- Start a new section for a new listing_id -->
+    <h3>Listing ID: {{ conversation.listing_id }}</h3>
+    <ul>
+        {% set current_listing_id = conversation.listing_id %}
+        {% endif %}
+        <li>
+            <a
+                href="{{ url_for('view_conversation', recipient_uni=conversation.other_user, listing_id=conversation.listing_id) }}">
+                View conversation with {{ conversation.other_user }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul> <!-- Close the last listing's conversations list -->
+</div>
 {% endblock %}

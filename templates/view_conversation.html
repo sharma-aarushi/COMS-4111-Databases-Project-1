@@ -14,7 +14,6 @@
 </div>
 
 <!-- Form to send a new message in the conversation -->
-<!-- Form to send a new message in the conversation -->
 <form action="{{ url_for('send_message', listing_id=listing_id) }}" method="post">
     <input type="hidden" name="receiver_uni" value="{{ recipient_uni }}">
     <input type="hidden" name="listing_id" value="{{ listing_id }}">
