@@ -44,8 +44,7 @@ def teardown_request(exception):
 # Login route
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    global current_user  # Use global variable to set current user
-
+    global current_user
     if request.method == 'POST':
         uni = request.form.get('uni')
         
@@ -80,14 +79,12 @@ def logout():
     flash("Logged out successfully.")
     return redirect(url_for('login'))
     
-# Utility function to check if user is logged in
+# Check if user is logged in
 def is_logged_in():
     global current_user
     return current_user is not None
 
-# Utility function to check if user is logged in
 def get_current_user():
-    # Ensure this function returns the UNI from session or global variable
     global current_user
     return current_user
 
@@ -95,7 +92,6 @@ def get_current_user():
 def inject_user():
     return {'current_user': current_user}
 
-# Home page with popular listings
 # Home page with popular listings
 @app.route('/')
 def show_popular_listings():
@@ -158,7 +154,7 @@ def view_item(listing_id):
 # Wishlist route
 @app.route('/wishlist')
 def wishlist():
-    user_uni = get_current_user()  # Ensure this function returns the logged-in user's UNI.
+    user_uni = get_current_user()
     if not user_uni:
         flash("Please log in to view your wishlist.")
         return redirect(url_for('login'))
@@ -174,7 +170,6 @@ def wishlist():
     with g.conn as conn:
         wishlist_items = conn.execute(query, {'user_uni': user_uni}).fetchall()
 
-    # Pass fetched items to the template
     return render_template("wishlist.html", wishlist_items=wishlist_items)
 
 # Add to wishlist
@@ -195,13 +190,12 @@ def add_to_wishlist(listing_id):
         if existing_entry:
             flash("Item is already in your wishlist.")
         else:
-            # Insert with the current date for dateadded
             conn.execute(insert_query, {
                 'user_uni': user_uni,
                 'listing_id': listing_id,
-                'dateadded': date.today()  # Automatically sets today's date
+                'dateadded': date.today()
             })
-            g.conn.commit()  # Explicit commit to save the change
+            g.conn.commit()
             flash("Item added to wishlist successfully.")
     
     return redirect(url_for('view_item', listing_id=listing_id))
@@ -213,18 +207,15 @@ def remove_from_wishlist(listing_id):
         flash("Please log in to manage your wishlist.")
         return redirect(url_for('login'))
 
-    # Remove the item from the wishlist for the logged-in user
     delete_query = text("DELETE FROM In_Wishlist WHERE uni = :user_uni AND listing_id = :listing_id")
     with g.conn as conn:
         conn.execute(delete_query, {'user_uni': user_uni, 'listing_id': listing_id})
-        g.conn.commit()  # Commit the changes
+        g.conn.commit()
 
     flash("Item removed from wishlist.")
     return redirect(url_for('wishlist'))
     
 # Buy item
-from datetime import date  # Ensure date is imported
-
 @app.route('/buy_item/<int:listing_id>', methods=['POST'])
 def buy_item(listing_id):
     user_uni = get_current_user()
@@ -234,7 +225,6 @@ def buy_item(listing_id):
 
     try:
         with g.conn as conn:
-            # Retrieve item details to verify and fetch necessary transaction data
             item_query = text("SELECT title, status, price, createdby FROM Listings WHERE listingid = :listing_id")
             item = conn.execute(item_query, {'listing_id': listing_id}).fetchone()
 
@@ -255,7 +245,7 @@ def buy_item(listing_id):
             result = conn.execute(update_query, {'listing_id': listing_id})
 
             if result.rowcount > 0:
-                # If the item was successfully marked as sold, insert the transaction
+                # If the item was marked as sold, insert the transaction into Transactions table
                 transaction_query = text("""
                     INSERT INTO Transactions (transactiondate, buyer, listingid, amount, seller)
                     VALUES (:transactiondate, :buyer, :listingid, :amount, :seller)
@@ -267,7 +257,7 @@ def buy_item(listing_id):
                     'amount': item.price,
                     'seller': item.createdby
                 })
-                conn.commit()  # Commit the transaction to ensure changes are saved
+                conn.commit()
 
                 flash("Purchase completed successfully!")
                 return render_template("purchase_success.html", item=item)
@@ -335,9 +325,13 @@ def new_listing():
         # Convert price to float and handle errors
         try:
             price = float(price)
+            if price < 0:
+                flash("Please enter a positive number for the price.")
+                print(price)
+                # return redirect(url_for('new_listing'))
         except ValueError:
             flash("Invalid price value.")
-            return redirect(url_for('new_listing'))
+            # return redirect(url_for('new_listing'))
 
         # Insert the new listing into the database
         query = text("""
@@ -387,7 +381,6 @@ def edit_listing(listing_id):
         status = request.form.get('status')
         link = request.form.get('link')
 
-        # Convert price to float and handle errors
         try:
             price = float(price)
         except ValueError:
@@ -525,7 +518,6 @@ def message_overview():
     with g.conn as conn:
         conversations = conn.execute(query, {'user_uni': user_uni}).fetchall()
 
-    # Convert result to a list of dictionaries to pass to the template
     conversations = [dict(row._mapping) for row in conversations]
 
     return render_template("message_overview.html", conversations=conversations)
@@ -555,15 +547,12 @@ def view_conversation(recipient_uni, listing_id):
             'listing_id': listing_id
         })
 
-        # Convert results to a list of dictionaries
         messages = [row._mapping for row in result]
 
-    # Pass user_uni to the template
     return render_template("messages.html", messages=messages, recipient_uni=recipient_uni, listing_id=listing_id, user_uni=user_uni)
 
 @app.route('/send_message/<int:listing_id>', methods=['POST'])
 def send_message(listing_id):
-    # Check if the user is logged in
     if not is_logged_in():
         flash("Please log in to send a message.")
         return redirect(url_for('login'))
@@ -597,10 +586,9 @@ def send_message(listing_id):
         print(f"An error occurred: {e}")
         flash("Failed to send the message.")
 
-    # Redirect back to the conversation view
     return redirect(url_for('view_conversation', recipient_uni=recipient, listing_id=listing_id))
 
-@app.route('/messages',  methods=['GET','POST'])
+@app.route('/messages', methods=['GET','POST'])
 @app.route('/messages/<int:listing_id>', methods=['GET','POST'])
 def messages(listing_id=None):
     print("MESSAGES")
@@ -609,7 +597,7 @@ def messages(listing_id=None):
         flash("Please log in to view messages.")
         return redirect(url_for('login'))
 
-    # If listing_id is provided, fetch the `recipient_uni` (seller) based on `createdby` attribute
+    # If listing_id is provided, fetch the recipient_uni (seller) based on createdby attribute of Listings table
     recipient_uni = None
     print(listing_id)
     if listing_id:
@@ -639,7 +627,7 @@ def messages(listing_id=None):
         VALUES (:content, :timestamp, :sender, :receiver)
     """)
 
-    print(query)
+    # print(query)
 
     with g.conn as conn:
         messages = conn.execute(query, {
@@ -684,9 +672,9 @@ def advanced_search():
         condition = request.args.get('condition', '').strip()
         status = request.args.get('status', '').strip()
         date_added = request.args.get('date_added')
-        createdby = request.args.get('createdby', '').strip()  # New field for creator's name
+        createdby = request.args.get('createdby', '').strip()
 
-        # SQL query with dynamic filtering, including user name, and excluding sold listings
+        # Query excluding sold listings
         query = """
             SELECT L.listingid, L.title, L.description, L.price, L.condition, L.status, L.location, L.link, L.dateadded, U.name AS createdby
             FROM Listings L
@@ -695,7 +683,6 @@ def advanced_search():
         """
         filters = {}
 
-        # Add filters based on user input
         if keyword:
             query += " AND (L.title ILIKE :keyword OR L.description ILIKE :keyword)"
             filters['keyword'] = f"%{keyword}%"
@@ -736,7 +723,6 @@ def highlight(text, keyword):
     highlighted_text = re.sub(f"({escaped_keyword})", r'<span class="highlight">\1</span>', text, flags=re.IGNORECASE)
     return Markup(highlighted_text)
 
-# Run the app
 if __name__ == "__main__":
     import click
 
