@@ -36,7 +36,8 @@
                 <p><strong>Price:</strong> ${{ item.price }}</p>
                 <p><strong>Location:</strong> {{ item.location }}</p>
                 <p><strong>Date Added:</strong> {{ item.dateadded }}</p>
-                <p><strong>Seller:</strong> {{ item.owner_name }}</p>
+                <p><strong>Seller:</strong> <a href="{{ url_for('search', query=item.owner_name) }}">{{ item.owner_name
+                        }}</a></p>
             </div>
         </div>
 
