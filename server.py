@@ -646,16 +646,15 @@ def search():
         flash("Please enter a keyword to search.")
         return redirect(url_for('show_popular_listings'))
 
-    # SQL query to search for the keyword in title, description, and user name, excluding sold listings
     query = text("""
-        SELECT L.listingid, L.title, L.description, L.link, U.name AS createdby
+        SELECT L.listingid, L.title, L.description, L.price, L.condition, L.status, L.link, L.category, U.name AS createdby
         FROM Listings L
         JOIN Users U ON L.createdby = U.uni
-        WHERE (L.title ILIKE :kw OR L.description ILIKE :kw OR U.name ILIKE :kw)
+        WHERE (L.title ILIKE :kw OR L.description ILIKE :kw OR L.category ILIKE :kw OR U.name ILIKE :kw)
           AND L.status != 'sold'
     """)
     search_keyword = f"%{keyword}%"
-    
+
     with g.conn as conn:
         results = conn.execute(query, {'kw': search_keyword}).fetchall()
 

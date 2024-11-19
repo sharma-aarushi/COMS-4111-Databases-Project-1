@@ -31,8 +31,9 @@
             <div class="card-text" style="color:#585858">
                 <p><strong>Condition:</strong> {{ item.condition }}</p>
                 <p><strong>Status:</strong> {{ item.status }}</p>
-                <p><strong>Category:</strong> <a href="{{ url_for('search', query=item.category) }}">{{ item.category
-                        }}</a></p>
+                <p><strong>Category:</strong>
+                    <a href="{{ url_for('search', query=item.category) }}">{{ item.category }}</a>
+                </p>
                 <p><strong>Price:</strong> ${{ item.price }}</p>
                 <p><strong>Location:</strong> {{ item.location }}</p>
                 <p><strong>Date Added:</strong> {{ item.dateadded }}</p>
