@@ -15,10 +15,14 @@
         {% set current_listing_id = conversation.listing_id %}
         {% endif %}
         <li>
+            {% if conversation.listing_id and conversation.other_user %}
             <a
                 href="{{ url_for('view_conversation', recipient_uni=conversation.other_user, listing_id=conversation.listing_id) }}">
                 View conversation with {{ conversation.other_user }}
             </a>
+            {% else %}
+            <span>Incomplete conversation data.</span>
+            {% endif %}
         </li>
         {% endfor %}
     </ul> <!-- Close the last listing's conversations list -->

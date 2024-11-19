@@ -460,24 +460,24 @@ def delete_listing(listing_id):
     return redirect(url_for('profile'))
     
 # Message seller
-@app.route('/message_seller/<int:listing_id>')
+@app.route('/message_seller/<int:listing_id>', methods=['POST'])
 def message_seller(listing_id):
     if not is_logged_in():
         flash("Please log in to send a message.")
         return redirect(url_for('login'))
 
     sender = get_current_user()  # Get the logged-in user's UNI
-    recipient = request.form.get('recipient_uni')  # Seller's UNI from form data
+
+    recipient = request.form.get('recipient_uni')  # Seller's UNI from the form
     message_content = request.form.get('message')
 
-    if not message_content:
-        flash("Message cannot be empty.")
+    if not message_content or not recipient:
+        flash("Message cannot be empty, and recipient must be specified.")
         return redirect(url_for('view_item', listing_id=listing_id))
 
-    # Insert the message into the Messages table
     insert_query = text("""
-        INSERT INTO Messages (content, timestamp, sender, receiver)
-        VALUES (:content, :timestamp, :sender, :receiver)
+        INSERT INTO Messages (content, timestamp, sender, receiver, listing_id)
+        VALUES (:content, :timestamp, :sender, :receiver, :listing_id)
     """)
 
     try:
@@ -486,13 +486,14 @@ def message_seller(listing_id):
                 'content': message_content,
                 'timestamp': datetime.now(),
                 'sender': sender,
-                'receiver': recipient
+                'receiver': recipient,
+                'listing_id': listing_id
             })
             conn.commit()
-            flash("Message sent to the seller.")
+            flash("Message sent successfully.")
     except Exception as e:
-        print(f"An error occurred: {e}")
-        flash("Failed to send the message.")
+        print(f"An error occurred while sending the message: {e}")
+        flash("Failed to send the message. Please try again.")
 
     return redirect(url_for('view_item', listing_id=listing_id))
 
@@ -506,14 +507,15 @@ def message_overview():
     # Get unique conversations for the current user based on sender, receiver, and listing_id
     query = text("""
         SELECT DISTINCT listing_id, 
-               CASE 
-                   WHEN sender = :user_uni THEN receiver 
-                   ELSE sender 
-               END AS other_user
+            CASE 
+                WHEN sender = :user_uni THEN receiver 
+                ELSE sender 
+            END AS other_user
         FROM Messages
         WHERE sender = :user_uni OR receiver = :user_uni
         ORDER BY listing_id, other_user;
-    """)
+            """)
+
 
     with g.conn as conn:
         conversations = conn.execute(query, {'user_uni': user_uni}).fetchall()
@@ -524,7 +526,6 @@ def message_overview():
 
 @app.route('/view_conversation/<string:recipient_uni>/<int:listing_id>')
 def view_conversation(recipient_uni, listing_id):
-    # Get the current user
     user_uni = get_current_user()
     if not user_uni:
         flash("Please log in to view conversations.")
@@ -546,7 +547,6 @@ def view_conversation(recipient_uni, listing_id):
             'recipient_uni': recipient_uni,
             'listing_id': listing_id
         })
-
         messages = [row._mapping for row in result]
 
     return render_template("messages.html", messages=messages, recipient_uni=recipient_uni, listing_id=listing_id, user_uni=user_uni)
@@ -730,7 +730,7 @@ if __name__ == "__main__":
     @click.option('--debug', is_flag=True)
     @click.option('--threaded', is_flag=True)
     @click.argument('HOST', default='0.0.0.0')
-    @click.argument('PORT', default=8138, type=int)
+    @click.argument('PORT', default=8137, type=int)
     def run(debug, threaded, host, port):
         HOST, PORT = host, port
         print("running on %s:%d" % (HOST, PORT))
